@@ -1,0 +1,48 @@
+# Dependencias de Node
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Directorios de compilación
+build/
+dist/
+coverage/
+.tmp/
+
+# Entornos y configuraciones sensibles
+.env
+.env.local
+.env.*.local
+
+# Cachés de logs y sistema
+logs/
+*.log
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Cachés del sistema operativo
+.DS_Store
+Thumbs.db
+.cache
+
+# Dependencias IDEs/Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Archivos de test
+coverage/
+junit.xml
+
+# Dependencias/artefactos de terceros
+.sass-cache/
+.pnpm-debug.log
+
+# Archivos temporales
+*.tmp
+*.swp
