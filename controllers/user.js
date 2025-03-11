@@ -14,7 +14,7 @@ const updateCode = require("../helpers/sustituirCodigo");
 
 const crearUsuario = async (req = request, res = response) => {
   const { username, password, repeat, email } = req.body;
-
+  const avatar = "https://i.postimg.cc/0Nq25498/avatar.png";
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -31,6 +31,7 @@ const crearUsuario = async (req = request, res = response) => {
 
     const nuevoUsuario = {
       username,
+      avatar,
       password: hashPassword,
       email,
     };
