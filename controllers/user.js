@@ -15,7 +15,10 @@ const updateCode = require("../helpers/sustituirCodigo");
 const crearUsuario = async (req = request, res = response) => {
   const { username, password, repeat, email } = req.body;
   const avatar = "https://i.postimg.cc/0Nq25498/avatar.png";
-  try {
+  const fechaActual = new Date(); 
+  const fecha_registrado = fechaActual.toISOString().slice(0, 19).replace('T', ' ');
+  
+try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -34,6 +37,7 @@ const crearUsuario = async (req = request, res = response) => {
       avatar,
       password: hashPassword,
       email,
+      fecha_registrado
     };
 
     db_config.query(
