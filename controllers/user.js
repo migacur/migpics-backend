@@ -154,14 +154,14 @@ const ingresarUsuario = async (req = request, res = response) => {
 
             res.cookie("access_token", token.accessToken, {
               httpOnly: true,
-              sameSite: "Strict",
-              secure: true,
+              sameSite: "None", // Usa "None" para permitir cookies en diferentes subdominios
+              secure: true, // Asegúrate de que las cookies solo se envíen a través de HTTPS
             });
-
+            
             res.cookie("refresh_token", token.refreshToken, {
               httpOnly: true,
-              sameSite: "Strict",
-              secure: true,
+              sameSite: "None", // Usa "None" para permitir cookies en diferentes subdominios
+              secure: true, // Asegúrate de que las cookies solo se envíen a través de HTTPS
             });
 
             return res.status(200).json({
