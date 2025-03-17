@@ -154,7 +154,7 @@ const mostrarPostPorId = async (req = request, res = response) => {
       (SELECT COUNT(*) FROM comentarios c WHERE c.publicacion_id = p.publicacion_id) AS comentarios_count,
       (SELECT COUNT(*) FROM respuestas_comentarios rc JOIN comentarios c ON rc.idComentario = c.comentario_id WHERE c.publicacion_id = p.publicacion_id) AS respuestas_count,
       (CASE WHEN FIND_IN_SET(?, GROUP_CONCAT(lp.user_id)) > 0 THEN true ELSE false END) AS verificacion_usuario,
-      (CASE WHEN EXISTS (SELECT * FROM Favoritos f WHERE f.idPublicacion = p.publicacion_id AND f.idUsuario = ?) THEN true ELSE false END) AS verificacion_favorito
+      (CASE WHEN EXISTS (SELECT * FROM favoritos f WHERE f.idPublicacion = p.publicacion_id AND f.idUsuario = ?) THEN true ELSE false END) AS verificacion_favorito
     FROM 
       publicaciones p
       LEFT JOIN likes_publicaciones lp ON p.publicacion_id = lp.publicacion_id
