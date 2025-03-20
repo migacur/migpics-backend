@@ -6,9 +6,9 @@ const db_config = mysql.createPool({
   password: process.env.PASSWORD,
   database: process.env.DATABASE,
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 3,
   queueLimit: 0,
-});
+}).promise();
 
 db_config.getConnection((err, connection) => {
   if (err) {

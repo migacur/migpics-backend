@@ -53,37 +53,35 @@ const agregarPost = async (req = request, res = response) => {
   }
 };
 
-const mostrarPostRecientes = async (req = request, res = response) => {
+const mostrarPostRecientes = async (req, res) => {
   const pagina = req.query.pagina || 1;
   const elementosPorPagina = req.query.elementosPorPagina || 20;
   const offset = (pagina - 1) * elementosPorPagina;
 
   const query = `
- SELECT publicaciones.publicacion_id, publicaciones.imagen,
-COUNT(likes_publicaciones.like_id) as likes_totales, publicaciones.fecha_publicacion 
-FROM publicaciones
-LEFT JOIN likes_publicaciones
-ON publicaciones.publicacion_id = likes_publicaciones.publicacion_id
-GROUP BY publicaciones.publicacion_id
-ORDER BY publicaciones.fecha_publicacion DESC LIMIT ? OFFSET ?;
- `;
+    SELECT publicaciones.publicacion_id, publicaciones.imagen,
+    COUNT(likes_publicaciones.like_id) as likes_totales, 
+    publicaciones.fecha_publicacion 
+    FROM publicaciones
+    LEFT JOIN likes_publicaciones
+    ON publicaciones.publicacion_id = likes_publicaciones.publicacion_id
+    GROUP BY publicaciones.publicacion_id
+    ORDER BY publicaciones.fecha_publicacion DESC LIMIT ? OFFSET ?;
+  `;
 
-  db_config.query(
-    query,
-    [parseInt(elementosPorPagina), offset],
-    (err, result) => {
-      if (err) {
-        console.log(err);
-        return res
-          .status(500)
-          .json({ error: "Ocurrió un error en el servidor" });
-      }
-      res.status(200).json(result);
-    }
-  );
+  try {
+    const [results] = await db_config.query(query, [
+      parseInt(elementosPorPagina), 
+      offset
+    ]);
+    res.status(200).json(results);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
 };
 
-const mostrarTendencias = (req = request, res = response) => {
+const mostrarTendencias = async(req = request, res = response) => {
   const pagina = req.query.pagina || 1;
   const elementosPorPagina = req.query.elementosPorPagina || 20;
   const offset = (pagina - 1) * elementosPorPagina;
@@ -117,83 +115,92 @@ ORDER BY promedio_total DESC
 LIMIT ? OFFSET ?
   `;
 
-  db_config.query(
-    query,
-    [parseInt(elementosPorPagina), offset],
-    (err, result) => {
-      if (err) {
-        console.log(err);
-        return res
-          .status(500)
-          .json({ error: "Ocurrió un error en el servidor" });
-      }
-      res.status(200).json(result);
-    }
-  );
+  try {
+    const [results] = await db_config.query(query, [
+      parseInt(elementosPorPagina), 
+      offset
+    ]);
+    res.status(200).json(results);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+
 };
 
-const mostrarPostPorId = async (req = request, res = response) => {
+const mostrarPostPorId = async (req, res) => {
   const postId = req.params.postId;
+  
   try {
-    if(!req.payload){
-      return res.status(401).json({ msg: "Tienes que ingresar para ver la publicación" });
+    if (!req.payload) {
+      return res.status(401).json({ 
+        msg: "Tienes que ingresar para ver la publicación" 
+      });
     }
 
     if (!postId) {
-      return res.status(500).json({ msg: "Error al mostrar la publicación" });
+      return res.status(400).json({ 
+        msg: "Error al mostrar la publicación" 
+      });
     }
 
     const query = `
-  SELECT 
-      p.*,
-      u.username AS creador_username,
-      u.avatar AS creador_avatar,
-      COUNT(lp.publicacion_id) AS likes_count,
-      COUNT(DISTINCT f.favorito_id) as contador_favoritos,
-      p.descargas,
-      (SELECT COUNT(*) FROM comentarios c WHERE c.publicacion_id = p.publicacion_id) AS comentarios_count,
-      (SELECT COUNT(*) FROM respuestas_comentarios rc JOIN comentarios c ON rc.idComentario = c.comentario_id WHERE c.publicacion_id = p.publicacion_id) AS respuestas_count,
-      (CASE WHEN FIND_IN_SET(?, GROUP_CONCAT(lp.user_id)) > 0 THEN true ELSE false END) AS verificacion_usuario,
-      (CASE WHEN EXISTS (SELECT * FROM favoritos f WHERE f.idPublicacion = p.publicacion_id AND f.idUsuario = ?) THEN true ELSE false END) AS verificacion_favorito
-    FROM 
-      publicaciones p
-      LEFT JOIN likes_publicaciones lp ON p.publicacion_id = lp.publicacion_id
-      LEFT JOIN favoritos f ON f.idPublicacion = p.publicacion_id
-      JOIN usuarios u ON p.idUsuario = u.user_id
-    WHERE 
-      p.publicacion_id = ?
-    GROUP BY 
-      p.publicacion_id, u.username,f.favorito_id
-  `;
+      SELECT 
+        p.*,
+        u.username AS creador_username,
+        u.avatar AS creador_avatar,
+        COUNT(lp.publicacion_id) AS likes_count,
+        COUNT(DISTINCT f.favorito_id) as contador_favoritos,
+        p.descargas,
+        (SELECT COUNT(*) FROM comentarios c WHERE c.publicacion_id = p.publicacion_id) AS comentarios_count,
+        (SELECT COUNT(*) FROM respuestas_comentarios rc 
+          JOIN comentarios c ON rc.idComentario = c.comentario_id 
+          WHERE c.publicacion_id = p.publicacion_id) AS respuestas_count,
+        (CASE WHEN FIND_IN_SET(?, GROUP_CONCAT(lp.user_id)) > 0 THEN true ELSE false END) AS verificacion_usuario,
+        (CASE WHEN EXISTS (SELECT * FROM favoritos f 
+          WHERE f.idPublicacion = p.publicacion_id 
+          AND f.idUsuario = ?) THEN true ELSE false END) AS verificacion_favorito
+      FROM 
+        publicaciones p
+        LEFT JOIN likes_publicaciones lp ON p.publicacion_id = lp.publicacion_id
+        LEFT JOIN favoritos f ON f.idPublicacion = p.publicacion_id
+        JOIN usuarios u ON p.idUsuario = u.user_id
+      WHERE 
+        p.publicacion_id = ?
+      GROUP BY 
+        p.publicacion_id, u.username, f.favorito_id
+    `;
 
-    db_config.query(
-      query,
-      [req.payload.id, req.payload.id, postId],
-      (err, result) => {
-        if (err) {
-          console.log(err);
-          const data = {
-            msg: "Ocurrió un error en el servidor",
-            redirect: `${process.env.FRONTEND_URL}/`
-          }
-          return res.status(500).json(data);
-        }
+    const [results] = await db_config.query(query, [
+      req.payload.id, 
+      req.payload.id, 
+      postId
+    ]);
 
-        if (result.length === 0) {
-          const data = {
-            msg: "No existe la publicación que intentas ver",
-            redirect: `${process.env.FRONTEND_URL}/`
-          }
-          return res.status(401).json(data);
-        }
+    if (!results || results.length === 0) {
+      return res.status(404).json({
+        msg: "No existe la publicación que intentas ver",
+        redirect: `${process.env.FRONTEND_URL}/`
+      });
+    }
 
-        actualizarContadorVisitas(postId);
+    await actualizarContadorVisitas(postId); 
 
-        return res.status(200).json(result[0]);
-      }
-    );
-  } catch (error) {
-    return res.status(500).json({ msg: "Ocurrió un error en el servidor" });
+    res.status(200).json(results[0]);
+
+  } catch (err) {
+    console.error('Error en mostrarPostPorId:', err);
+
+    const errorResponse = {
+      msg: "Ocurrió un error en el servidor",
+      redirect: `${process.env.FRONTEND_URL}/`
+    };
+
+    if (err.code === 'ER_PARSE_ERROR') {
+      errorResponse.msg = "Error en la consulta a la base de datos";
+    }
+
+    res.status(500).json(errorResponse);
   }
 };
 
@@ -213,17 +220,16 @@ GROUP BY c.comentario_id, c.texto, u.username, c.user_id, c.publicacion_id
 ORDER BY c.fecha_creado DESC;
 `;
 
-  db_config.query(query, [postId], (error, results) => {
-    if (error) {
-      return res
-        .status(500)
-        .json({ msg: "Ocurrió un error al mostrar los comentarios" });
-    }
-    return res.status(200).json(results);
-  });
+try {
+  const [results] =  await db_config.query(query, [postId]);
+  return res.status(200).json(results);
+} catch (error) {
+  return res.status(500).json({msg:"Ha ocurrido un error al mostrar los comentarios"});
+}
+
 };
 
-const mostrarRespuestasComentario = (req = request, res = response) => {
+const mostrarRespuestasComentario = async(req = request, res = response) => {
   const { comentarioId } = req.params;
 
   const query = `
@@ -236,29 +242,26 @@ ORDER BY fecha_creado DESC;
 
   `;
 
-  db_config.query(query, [comentarioId], (error, results) => {
-    if (error) {
-      return res
-        .status(500)
-        .json({ msg: "Ocurrió un error al realizar esta acción" });
-    }
-    return res.status(200).json(results);
-  });
+
+try {
+  const [results] = await db_config.query(query, [comentarioId]);
+  return res.status(200).json(results);
+} catch (error) {
+  return res.status(500).json({msg:"Ha ocurrido un error al realizar esta solicitud"});
+}
 };
 
-const borrarRespuestasComentario = (req = request, res = response) => {
+const borrarRespuestasComentario = async(req = request, res = response) => {
   const { id } = req.params;
 
   const query = "DELETE FROM respuestas_comentarios WHERE respuesta_id = ?";
-
-  db_config.query(query, [id], (error, results) => {
-    if (error) {
-      return res
-        .status(500)
-        .json({ msg: "Ocurrió un error al realizar esta acción" });
-    }
-    return res.status(200).json({ msg: "Respuesta eliminada exitosamente" });
-  });
+try {
+  await db_config.query(query, [id])
+  return res.status(200).json({ msg: "Respuesta eliminada exitosamente" });
+} catch (error) {
+  return res.status(500).json({ msg: "Ocurrió un error al eliminar la respuesta" });
+}
+  
 };
 
 const agregarComentario = async (req = request, res = response) => {
@@ -266,19 +269,12 @@ const agregarComentario = async (req = request, res = response) => {
     const { postId } = req.params;
     const userId = req.body.id;
     const comentario = req.body.comentario;
-    console.log(postId, userId, comentario);
-
+  
     const query =
       "INSERT INTO comentarios (texto, publicacion_id, user_id, fecha_creado) VALUES (?, ?, ?, NOW())";
 
-    db_config.query(query, [comentario, postId, userId], (err, results) => {
-      if (err) {
-        return res
-          .status(500)
-          .json({ msg: "Ocurrió un error, no se pudo publicar su comentario" });
-      }
-      return res.status(200).json({ msg: "Su comentario fue publicado" });
-    });
+  await db_config.query(query, [comentario, postId, userId])
+  return res.status(200).json({ msg: "Su comentario fue publicado" });
   } catch (error) {
     console.error(error);
     return res
@@ -292,16 +288,17 @@ const eliminarComentario = async (req = request, res = response) => {
 
   const query = "DELETE FROM comentarios WHERE comentario_id = ?";
 
-  db_config.query(query, [id], (error, results) => {
-    if (error) {
-      return res
+  try {
+    await db_config.query(query, [id]);
+    return res
+    .status(200)
+    .json({ msg: "Tu comentario fue eliminado exitosamente" });
+  } catch (error) {
+    return res
         .status(500)
         .json({ msg: "Ocurrió un error al mostrar los comentarios" });
-    }
-    return res
-      .status(200)
-      .json({ msg: "Tu comentario fue eliminado exitosamente" });
-  });
+  }
+
 };
 
 const buscarPost = async (req = request, res = response) => {
@@ -321,17 +318,9 @@ const buscarPost = async (req = request, res = response) => {
   ORDER BY publicaciones.fecha_publicacion DESC
     `;
     const value = [`%${palabra}%`];
-  
-    db_config.query(query, value, (err, result) => {
-      if (err) {
-        console.log(err);
-        res
-          .status(500)
-          .json({ msg: "Ha ocurrido un error al realizar la búsqueda" });
-      } else {
-        res.status(200).json(result);
-      }
-    });
+
+    const [results] = await db_config.query(query, value);
+    return res.status(200).json(results);
   } catch (error) {
       console.log(error)
       return res.status(500).json({msg:"Ha ocurrido un error en el servidor"})
@@ -359,20 +348,14 @@ const mostrarPostUsusario = async (req = request, res = response) => {
   LIMIT ? OFFSET ?
   `;
 
-  db_config.query(
-    query,
-    [username, username, parseInt(elementosPorPagina), offset],
-    (err, result) => {
-      if (err) {
-        console.log(err);
-        res
-          .status(500)
-          .json({ msg: "Ha ocurrido un error al realizar la búsqueda" });
-      } else {
-        res.status(200).json(result);
-      }
-    }
-  );
+  try {
+    const [results] = await db_config
+          .query(query,[username, username, parseInt(elementosPorPagina), offset]);
+    return res.status(200).json(results);
+  } catch (error) {
+    console.log(error)
+    return res.status(500).json({msg:"Ha ocurrido un error en el servidor"})
+  }
 };
 
 const mostrarComentariosUsuario = async (req = request, res = response) => {
