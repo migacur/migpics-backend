@@ -358,31 +358,35 @@ const mostrarPostUsusario = async (req = request, res = response) => {
   }
 };
 
-const mostrarComentariosUsuario = async (req = request, res = response) => {
-  const { username } = req.params;
-  const pagina = req.query.pagina || 1;
-  const elementosPorPagina = req.query.elementosPorPagina || 10;
-  const offset = (pagina - 1) * elementosPorPagina;
+const mostrarComentariosUsuario = async (req, res) => {
+  try {
+    const { username } = req.params;
+    const pagina = req.query.pagina || 1;
+    const elementosPorPagina = req.query.elementosPorPagina || 10;
+    const offset = (pagina - 1) * elementosPorPagina;
 
-  if (!req.payload) {
-    return res.status(401).json({ msg: "Usuario no autorizado" });
-  }
+    // Validaciones
+    if (!req.payload) {
+      return res.status(401).json({ msg: "Usuario no autorizado" });
+    }
 
-  if (username !== req.payload.username) {
-    return res.status(401).json({ msg: "No puedes ver los comentarios de este usuario" });
-  }
+    if (username !== req.payload.username) {
+      return res.status(403).json({ msg: "No puedes ver los comentarios de este usuario" });
+    }
 
-  const query1 = `
-    SELECT comentarios.*, usuarios.username, publicaciones.titulo
+
+    const query1 = `
+      SELECT comentarios.*, usuarios.username, publicaciones.titulo
     FROM comentarios
     JOIN usuarios ON comentarios.user_id = usuarios.user_id
     JOIN publicaciones ON comentarios.publicacion_id = publicaciones.publicacion_id
     WHERE usuarios.username = ?
     ORDER BY comentarios.fecha_creado DESC
     LIMIT ? OFFSET ?
-  `;
-
-  const query2 = `SELECT respuestas_comentarios.*, usuarios.username AS username_respuesta, usuarios.avatar, u_comentario.username AS comentario_de, 
+    `;
+    
+    const query2 = `
+     SELECT respuestas_comentarios.*, usuarios.username AS username_respuesta, usuarios.avatar, u_comentario.username AS comentario_de, 
   comentarios.publicacion_id,publicaciones.titulo
   FROM respuestas_comentarios
   JOIN usuarios ON respuestas_comentarios.idUser = usuarios.user_id
@@ -392,42 +396,40 @@ const mostrarComentariosUsuario = async (req = request, res = response) => {
   WHERE respuestas_comentarios.idUser = ?
   ORDER BY respuestas_comentarios.fecha_creado DESC
   LIMIT ? OFFSET ?
-  `;
+    `;
 
-  db_config.query(
-    query1,
-    [username, parseInt(elementosPorPagina), offset],
-    (err, result) => {
-      if (err) {
-        console.log(err);
-        return res
-          .status(500)
-          .json({ msg: "Ha ocurrido un error al realizar la búsqueda" });
-      }
+    // Ejecutar consultas en paralelo (mejor performance)
+    const [comentarios, respuestas] = await Promise.all([
+      db_config.query(query1, [username, elementosPorPagina, offset]),
+      db_config.query(query2, [req.payload.id, elementosPorPagina, offset])
+    ]);
 
-      const comentarios = result;
+    // Si necesitas procesar los resultados:
+    const comentariosProcesados = comentarios[0];
+    const respuestasProcesadas = respuestas[0];
 
-      db_config.query(
-        query2,
-        [req.payload.id, parseInt(elementosPorPagina), offset],
-        (err, result) => {
-          if (err) {
-            console.log(err);
-            return res
-              .status(500)
-              .json({ msg: "Ha ocurrido un error al obtener las respuestas" });
-          }
+    res.status(200).json({ 
+      comentarios: comentariosProcesados, 
+      respuestas: respuestasProcesadas 
+    });
 
-          const respuestas = result;
+  } catch (error) {
+    console.error('Error en mostrarComentariosUsuario:', error);
+    
+    // Manejar diferentes tipos de errores
+    let statusCode = 500;
+    let errorMessage = "Ha ocurrido un error al procesar la solicitud";
 
-          res.status(200).json({ comentarios, respuestas });
-        }
-      );
+    if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      statusCode = 403;
+      errorMessage = "Acceso denegado a los recursos";
     }
-  );
+
+    res.status(statusCode).json({ msg: errorMessage });
+  }
 };
 
-const eliminarPublicacion = (req, res) => {
+const eliminarPublicacion = async(req, res) => {
   const imagenUrl = req.body.imagenId;
   const { postId } = req.params;
   const userId = req.payload.id;
@@ -443,17 +445,12 @@ const eliminarPublicacion = (req, res) => {
     const query =
       "DELETE FROM publicaciones WHERE publicacion_id = ? AND idUsuario = ?";
 
-    db_config.query(query, [postId, userId], (error, results) => {
-      if (error) {
-        return res
-          .status(400)
-          .json({ msg: "Ocurrió un error al realizar esta acción" });
-      }
-      eliminarImagenCloudinary(imagenUrl);
+    await db_config.query(query, [postId, userId])
+    eliminarImagenCloudinary(imagenUrl)
       return res
         .status(200)
         .json({ msg: "La publicación fue eliminada exitosamente" });
-    });
+ 
   } catch (error) {
     console.log(error);
     return res
@@ -462,7 +459,7 @@ const eliminarPublicacion = (req, res) => {
   }
 };
 
-const editarPublicacion = (req = request, res = response) => {
+const editarPublicacion = async(req = request, res = response) => {
   const { titulo, descripcion } = req.body.data;
   const { postId } = req.params;
   const { id } = req.payload;
@@ -480,22 +477,20 @@ const editarPublicacion = (req = request, res = response) => {
                    WHERE publicacion_id = ? 
                    AND idUsuario = ?`;
 
-  db_config.query(query, [titulo, descripcion, postId, id], (err, result) => {
-    if (err) {
-      console.log(err);
-      res.status(500).json({
-        msg: "Error al editar la publicación",
-      });
-    } else {
-      console.log(result);
-      res.status(200).json({
-        msg: "Se ha editado la publicación exitosamente...redireccionando",
-      });
-    }
-  });
+                   try {
+                    await db_config.query(query, [titulo, descripcion, postId, id])
+                    res.status(200).json({
+                      msg: "Se ha editado la publicación exitosamente...redireccionando",
+                    });
+                   } catch (error) {
+                    console.log(error);
+                    res.status(500).json({
+                      msg: "Error al editar la publicación",
+                    });
+                   }
 };
 
-const enviarRepuestaComentario = (req = request, res = response) => {
+const enviarRepuestaComentario = async(req = request, res = response) => {
   const idComentario = req.body.infoRespuesta[0].comentarioId;
   const idUser = req.body.infoRespuesta[0].idUser;
   const contenido = req.body.respuesta;
@@ -504,16 +499,17 @@ const enviarRepuestaComentario = (req = request, res = response) => {
   (idComentario,idUser,contenido,fecha_creado) VALUES (?,?,?,NOW())
   `;
 
-  db_config.query(query, [idComentario, idUser, contenido], (err, results) => {
-    if (err) {
-      return res
-        .status(500)
-        .json({ msg: "Ocurrió un error, no se pudo publicar su respuesta" });
-    }
+  try {
+    await db_config.query(query, [idComentario, idUser, contenido])
     return res.status(200).json({
       msg: "Su respuesta fue publicada",
     });
-  });
+  } catch (error) {
+    return res
+    .status(500)
+    .json({ msg: "Ocurrió un error, no se pudo publicar su respuesta" });
+  }
+
 };
 
 const mostrarListadoLikes = async (req = request, res = response) => {
@@ -534,21 +530,18 @@ LIMIT ? OFFSET ?;
 
   `;
 
-  db_config.query(
-    query,
-    [postId, parseInt(elementosPorPagina), offset],
-    (err, results) => {
-      if (err) {
-        console.log(err);
-        return res
-          .status(500)
-          .json({
-            msg: "Ocurrió un error al mostrar los me gusta de esta publicación",
-          });
-      }
-      res.status(200).json(results);
-    }
-  );
+  try {
+    const [results] = await db_config.query(query,[postId, parseInt(elementosPorPagina), offset])
+    return  res.status(200).json(results);
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(500)
+      .json({
+        msg: "Ocurrió un error al mostrar los me gusta de esta publicación",
+      });
+  }
+
 };
 
 module.exports = {

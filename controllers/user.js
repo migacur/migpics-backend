@@ -11,7 +11,7 @@ const sendEmailCode = require("../helpers/sendEmail");
 const eliminarCodigoBBDD = require("../helpers/eliminarCodigo");
 const { validationResult } = require("express-validator");
 const updateCode = require("../helpers/sustituirCodigo");
-
+/*
 const crearUsuario = async (req = request, res = response) => {
   const { username, password, repeat, email } = req.body;
   const avatar = "https://i.postimg.cc/0Nq25498/avatar.png";
@@ -40,58 +40,36 @@ try {
       fecha_registrado
     };
 
-    db_config.query(
+    const [buscarUser] = await db_config.query(
       "SELECT * FROM usuarios WHERE username = ?",
-      [username],
-      (error, results) => {
-        if (error) {
-          console.error("Error al buscar el usuario: ", error);
-          return res.status(500).json({ msg: "Error al registrar el usuario" });
-        }
+      [username])
 
-        if (results.length > 0) {
+        if (buscarUser.length > 0) {
           return res
             .status(400)
             .json({ msg: "Ya existe un usuario registrado con ese nombre" });
         }
 
-        db_config.query(
+    const [buscarEmail] = await db_config.query(
           "SELECT * FROM usuarios WHERE email = ?",
-          [email],
-          (error, results) => {
-            if (error) {
-              console.error("Error al buscar el usuario: ", error);
-              return res
-                .status(500)
-                .json({ msg: "Error al registrar el usuario" });
-            }
+          [email])
 
-            if (results.length > 0) {
+            if (buscarEmail.length > 0) {
               return res.status(400).json({
                 msg: "El correo electrónico ya se encuentra registrado",
               });
             }
 
-            db_config.query(
+            await db_config.query(
               "INSERT INTO usuarios SET ?",
-              nuevoUsuario,
-              (error, results) => {
-                if (error) {
-                  console.error("Error al insertar el usuario: ", error);
-                  return res
-                    .status(500)
-                    .json({ msg: "Error al registrar el usuario" });
-                }
+              nuevoUsuario)
 
-                res
+                return res
                   .status(200)
                   .json({ msg: "Usuario registrado correctamente" });
-              }
-            );
-          }
-        );
-      }
-    );
+              
+            
+ 
   } catch (e) {
     console.log(e);
     return res.status(500).json({
@@ -99,101 +77,196 @@ try {
     });
   }
 };
+*/
+const crearUsuario = async (req, res) => {
+  const { username, password, repeat, email } = req.body;
+  const avatar = "https://i.postimg.cc/0Nq25498/avatar.png";
+  
+  try {
+    // Validación de express-validator
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-const ingresarUsuario = async (req = request, res = response) => {
+    if (password !== repeat) {
+      return res.status(400).json({ msg: "Las contraseñas no coinciden" });
+    }
+
+    const hashPassword = await bcrypt.hash(password, 10);
+
+    // Iniciar transacción
+    const connection = await db_config.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Verificar usuario y email en una sola consulta (mejor performance)
+      const [userExists] = await connection.query(
+        "SELECT username, email FROM usuarios WHERE username = ? OR email = ?",
+        [username, email]
+      );
+
+      if (userExists.some(u => u.username === username)) {
+        return res.status(400).json({ msg: "Nombre de usuario ya registrado" });
+      }
+
+      if (userExists.some(u => u.email === email)) {
+        return res.status(400).json({ msg: "Correo electrónico ya registrado" });
+      }
+
+      // Insertar con fecha manejada por MySQL
+      await connection.query(
+        "INSERT INTO usuarios (username, avatar, password, email, fecha_registrado) VALUES (?, ?, ?, ?, NOW())",
+        [username, avatar, hashPassword, email]
+      );
+
+      await connection.commit();
+      res.status(201).json({ msg: "Usuario registrado correctamente" });
+
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+  } catch (e) {
+    console.error('Error en crearUsuario:', e);
+    
+    let msg = "Error interno del servidor";
+    if (e.code === 'ER_DUP_ENTRY') {
+      msg = "El usuario o correo ya existe";
+    }
+    
+    res.status(500).json({ msg });
+  }
+};
+
+const ingresarUsuario = async (req, res) => {
   const { username, password } = req.body;
 
   try {
+    // Validaciones
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    // Buscar usuario
+    const [users] = await db_config.query(
+      "SELECT * FROM usuarios WHERE username = ?", 
+      [username]
+    );
+
+    if (users.length === 0) {
+      return res.status(401).json({ msg: "Credenciales inválidas" });
     }
 
-    db_config.query(
-      "SELECT * FROM usuarios WHERE username = ?",
-      [username],
-      async (error, results) => {
-        if (error) {
-          console.log(error);
-          return res
-            .status(500)
-            .json({ msg: "Ocurrió un error, usuario no encontrado" });
-        }
+    const user = users[0];
+    
+    // Verificar contraseña
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ msg: "Credenciales inválidas" });
+    }
 
-        const storedPassword = results[0]?.password;
+    // Generar tokens
+    const token = generarToken(user);
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + 7);
 
-        if (
-          results.length === 0 ||
-          !(await bcrypt.compare(password, storedPassword))
-        ) {
-          return res
-            .status(400)
-            .json({ msg: "Usuario y/o contraseña incorrectos" });
-        }
+    // Transacción para insertar token
+    const connection = await db_config.getConnection();
+    await connection.beginTransaction();
 
-        const token = generarToken(results[0]);
-        const usuario = {
-          id: results[0].user_id,
-          username: results[0].username,
-        };
+    try {
+      await connection.query(
+        `INSERT INTO refresh_tokens (token, user_id, expiracion) VALUES (?, ?, ?)`,
+        [token.refreshToken, user.user_id, expiryDate]
+      );
 
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 7);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
 
-        const query = `INSERT INTO refresh_tokens (token, user_id, expiracion) VALUES (?, ?, ?)`;
-        db_config.query(
-          query,
-          [token.refreshToken, results[0].user_id, expiryDate],
-          (err) => {
-            if (err) {
-              console.error("Error al insertar token:", err);
-              return res
-                .status(500)
-                .json({ msg: "Error interno del servidor" });
-            }
-
-            res.cookie("access_token", token.accessToken, {
-              httpOnly: true,
-              sameSite: "None", // Usa "None" para permitir cookies en diferentes subdominios
-              secure: true, // Asegúrate de que las cookies solo se envíen a través de HTTPS
-            });
-            
-            res.cookie("refresh_token", token.refreshToken, {
-              httpOnly: true,
-              sameSite: "None", // Usa "None" para permitir cookies en diferentes subdominios
-              secure: true, // Asegúrate de que las cookies solo se envíen a través de HTTPS
-            });
-
-            return res.status(200).json({
-              user: usuario,
-            });
-          }
-        );
-      }
-    );
-  } catch (e) {
-    console.log(e);
-    return res.status(500).json({
-      msg: "Hubo un error, contacte con el administrador de la web",
+    // Setear cookies
+    res.cookie("access_token", token.accessToken, {
+      httpOnly: true,
+      sameSite: "None",
+      secure: true,
+      maxAge: 15 * 60 * 1000 // 15 min (ejemplo)
     });
+
+    res.cookie("refresh_token", token.refreshToken, {
+      httpOnly: true,
+      sameSite: "None",
+      secure: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 días
+    });
+
+    return res.status(200).json({
+      user: {
+        id: user.user_id,
+        username: user.username
+      }
+    });
+
+  } catch (e) {
+    console.error("Error en ingresarUsuario:", e);
+    
+    const statusCode = e.code === 'ER_DUP_ENTRY' ? 409 : 500;
+    const msg = e.code === 'ER_DUP_ENTRY' 
+      ? "Sesión ya activa" 
+      : "Error interno del servidor";
+
+    return res.status(statusCode).json({ msg });
   }
 };
 
-const cerrarSesion = (req = request, res = response) => {
+const cerrarSesion = async (req, res) => {
   try {
-    const usuarioId = req.body.userId
-    if(!usuarioId){
-      return res.status(400).json({msg: "No se pudo realizar esta solicitud"})
+    const usuarioId = req.body.userId;
+
+    if (!usuarioId) {
+      return res.status(400).json({ msg: "Se requiere ID de usuario" });
     }
-    const query = `DELETE FROM refresh_tokens WHERE user_id = ?`;
-    db_config.query(query, [usuarioId], (err) => {
-      if (err) throw err;
-      res.clearCookie("access_token");
-      res.clearCookie("refresh_token");
-      res.status(200).json({ msg: "Cierre de sesión exitoso" });
+
+    // 1. Eliminar tokens
+    const [result] = await db_config.query(
+      "DELETE FROM refresh_tokens WHERE user_id = ?",
+      [usuarioId]
+    );
+
+    // 2. Verificar si se eliminó algo (opcional)
+    if (result.affectedRows === 0) {
+      console.warn(`No había tokens para el usuario ${usuarioId}`);
+    }
+
+    // 3. Limpiar cookies (con mismas opciones de creación)
+    res.clearCookie("access_token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
     });
+
+    res.clearCookie("refresh_token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+    });
+
+    // 4. Respuesta exitosa
+    res.status(200).json({ msg: "Sesión cerrada exitosamente" });
+
   } catch (error) {
-    res.status(500).json({ msg: "Ha ocurrido un error en el servidor" });
+    console.error("Error en cerrarSesion:", error);
+    
+    // 5. Manejo específico de errores de BBDD
+    const msg = error.code === 'ER_LOCK_WAIT_TIMEOUT' 
+      ? "Intenta cerrar sesión nuevamente" 
+      : "Error interno";
+
+    res.status(500).json({ msg });
   }
 };
 
