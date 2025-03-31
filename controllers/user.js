@@ -119,7 +119,7 @@ const crearUsuario = async (req, res) => {
       );
 
       await connection.commit();
-      res.status(201).json({ msg: "Usuario registrado correctamente" });
+      res.status(200).json({ msg: "Usuario registrado correctamente" });
 
     } catch (error) {
       await connection.rollback();
@@ -270,53 +270,83 @@ const cerrarSesion = async (req, res) => {
   }
 };
 
-const cambiarAvatar = async (req = request, res = response) => {
+const cambiarAvatar = async (req, res) => {
   const { id } = req.params;
+  const userOn = req.payload?.id; // ID del usuario autenticado
+  let connection;
 
-  const archivo = await cloudinary.uploader.upload(req.file.path);
+  try {
+    // Validaciones iniciales
+    if (!req.file) throw new Error("Archivo no proporcionado");
+    if (parseInt(id) !== userOn) throw new Error("No autorizado");
 
-  const query = "SELECT * FROM usuarios where user_id = ?";
+    // Iniciar transacción
+    connection = await db_config.getConnection();
+    await connection.beginTransaction();
 
-  db_config.query(query, [id], async (error, results) => {
-    if (error) {
-      console.log(error);
-      return res
-        .status(500)
-        .json({ msg: "Ocurrió un error en la búsqueda del usuario" });
+    // 1. Subir imagen a Cloudinary
+    const archivo = await cloudinary.uploader.upload(req.file.path, {
+      folder: "avatars",
+      allowed_formats: ["jpg", "png", "webp"]
+    });
+
+    // 2. Obtener avatar actual
+    const [usuarios] = await connection.query(
+      "SELECT avatar FROM usuarios WHERE user_id = ? FOR UPDATE",
+      [id]
+    );
+    if (usuarios.length === 0) throw new Error("Usuario no existe");
+
+    // 3. Eliminar avatar antiguo (si existe)
+    const avatarAnterior = usuarios[0].avatar;
+    if (avatarAnterior) {
+      await eliminarImagenCloudinary(avatarAnterior); 
     }
-    if (results.length > 0) {
-      await eliminarImagenCloudinary(results[0].avatar);
-      const avatarNuevo = archivo.url;
-      // Editar usuario
-      const queryUpdate = `UPDATE usuarios SET 
-          avatar = ?
-          WHERE user_id = ?`;
 
-      db_config.query(
-        queryUpdate,
-        [avatarNuevo, id],
-        async (error, results) => {
-          if (error) {
-            console.log(error);
-            return res
-              .status(500)
-              .json({ msg: "Ocurrió un error en la búsqueda del usuario" });
-          }
-        }
-      );
+    // 4. Actualizar en BBDD
+    await connection.query(
+      "UPDATE usuarios SET avatar = ? WHERE user_id = ?",
+      [archivo.secure_url, id]
+    );
+
+    // 5. Commit y limpieza
+    await connection.commit();
+    await fs.promises.unlink(req.file.path); 
+
+    res.status(200).json({ 
+      success: true,
+      avatar: archivo.secure_url
+    });
+
+  } catch (error) {
+    // Rollback y manejo de errores
+    if (connection) {
+      await connection.rollback();
+      connection.release();
     }
-  });
 
-  await fs.unlink(req.file.path);
-  return res.status(200).json({
-    msg: "Has cambiado tu avatar exitosamente, en breve se realizarán los cambios",
-  });
+    // Eliminar archivo temporal si existe
+    if (req.file?.path) {
+      await fs.promises.unlink(req.file.path).catch(console.error);
+    }
+
+    console.error(`Error en cambiarAvatar [UID:${id}]:`, error);
+    
+    const statusCode = error.message.includes("No autorizado") ? 403 : 500;
+    res.status(statusCode).json({
+      error: error.message,
+      ...(process.env.NODE_ENV === "development" && { stack: error.stack })
+    });
+
+  } finally {
+    if (connection) connection.release();
+  }
 };
 
 const mostrarPerfilPublico = async (req = request, res = response) => {
   const { username } = req.params;
   const userLogueado = req.payload.id;
-console.log(req.payload.username.toLowerCase(),username)
+//console.log(req.payload.username.toLowerCase(),username)
   if (!userLogueado) {
     return res
       .status(401)
@@ -360,25 +390,23 @@ GROUP BY
   lo_sigue;
   `;
 
-  db_config.query(
-    queryUser,
-    [userLogueado, username, username],
-    (error, results) => {
-      if (error) {
-        return res
-          .status(500)
-          .json({ msg: "Ocurrió un error al acceder a este enlace" });
-      }
-      console.log(results);
-      if (!results.length) {
-        return res
-          .status(500)
-          .json({ msg: `El usuario ${username} no existe` });
-      }
+  try {
+    const [results] = await db_config.query(
+      queryUser,
+      [userLogueado, username, username])
 
-      return res.status(200).json(results[0]);
-    }
-  );
+  if(!results.length){
+    return res
+    .status(500)
+    .json({ msg: `El usuario ${username} no existe` });
+  }
+    return res.status(200).json(results[0]);
+  } catch (error) {
+    return res
+    .status(500)
+    .json({ msg: "Ocurrió un error al mostrar este enlace" });
+  }
+
 };
 
 const mostrarPerfilPrivado = async (req = request, res = response) => {
@@ -432,15 +460,17 @@ GROUP BY
   usuarios.user_id;
 
   `;
-
-  db_config.query(query, [userLogin], (error, results) => {
-    if (error) {
-      return res
-        .status(500)
-        .json({ msg: "Ocurrió un error al ingresar a esta ruta" });
-    }
+ 
+  try {
+    const [results] = await db_config.query(query, [userLogin])
+    if(!results.length) return res.status(401).json({msg:"No puedes acceder a este enlace"});
     return res.status(200).json(results[0]);
-  });
+  } catch (error) {
+    return res
+    .status(500)
+    .json({ msg: "Ocurrió un error al ingresar a esta ruta" });
+  }
+
 };
 
 const mostrarPublicacionesFavoritas = async (req = request, res = response) => {
@@ -476,21 +506,21 @@ ORDER BY favoritos.fecha_agregado DESC
 LIMIT ? OFFSET ?;
   `;
 
-  db_config.query(
-    query,
-    [userId, parseInt(elementosPorPagina), offset],
-    (error, results) => {
-      console.log(results.username);
-      if (error) {
-        return res
-          .status(500)
-          .json({ msg: "Ocurrió un error al mostrar la data" });
-      }
-      return res.status(200).json(results);
+  try {
+    const [results] = await db_config
+          .query(query,[userId, parseInt(elementosPorPagina), offset])
+    if(!results.length){
+      return res.status(200).json({msg:"No se encontraron publicaciones para este usuario"})
     }
-  );
-};
+    return res.status(200).json(results);
+  } catch (error) {
+    return res
+    .status(500)
+    .json({ msg: "Ocurrió un error al mostrar la data" });
+  }
 
+};
+/*
 const seguirUsuario = async (req = request, res = response) => {
   const seguidorId = req.payload.id;
   const { userId } = req.params;
@@ -518,9 +548,6 @@ const seguirUsuario = async (req = request, res = response) => {
     await db_config.query(query1, [seguidorId, userId]);
     await db_config.query(query2, [seguidorId, userId]);
 
-    // Emitir evento de notificación al usuario seguido
-    //io.to(userId).emit('nuevaNotificacion', '¡Te están siguiendo!');
-
     return res.status(200).json({
       msg: "Ahora sigues a este usuario",
       isFollow: true,
@@ -531,37 +558,131 @@ const seguirUsuario = async (req = request, res = response) => {
       .status(500)
       .json({ msg: "Ha ocurrido un error al seguir a este usuario" });
   }
-};
+}; */
 
-const dejarSeguirUsuario = async (req = request, res = response) => {
+const dejarSeguirUsuario = async (req, res) => {
   const { userId } = req.params;
   const seguidorId = req.payload.id;
+  let connection;
 
-  if (seguidorId === parseInt(userId)) {
-    return res.status(400).json({ msg: "No puedes seguirte a ti mismo" });
-  }
-
-  const query1 =
-    "DELETE FROM seguidores WHERE seguidor_id = ? AND followed_id = ?";
-  const query2 = "DELETE FROM seguidos WHERE userId = ? AND seguido_id = ?";
-
-  db_config.query(query1, [seguidorId, userId], (error, results) => {
-    if (error) {
-      return res
-        .status(500)
-        .json({ msg: "Ocurrió un error al realizar esta acción" });
+  try {
+    // Validación de entradas
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: "ID de usuario inválido" });
     }
-    db_config.query(query2, [seguidorId, userId], (error, results) => {
-      if (error) {
-        return res
-          .status(500)
-          .json({ msg: "Ocurrió un error al realizar esta acción" });
+
+    if (seguidorId === parseInt(userId)) {
+      return res.status(400).json({ error: "Acción no permitida" });
+    }
+
+    connection = await db_config.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Verificar existencia previa del seguimiento
+    const [seguimiento] = await connection.query(
+      `SELECT COUNT(*) AS count FROM seguidores 
+       WHERE seguidor_id = ? AND followed_id = ? FOR UPDATE`,
+      [seguidorId, userId]
+    );
+
+    if (seguimiento[0].count === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: "No estabas siguiendo a este usuario" });
+    }
+
+    // 2. Eliminación atómica en ambas tablas
+    await connection.query(
+      `DELETE FROM seguidores 
+       WHERE seguidor_id = ? AND followed_id = ?`,
+      [seguidorId, userId]
+    );
+
+    await connection.query(
+      `DELETE FROM seguidos 
+       WHERE userId = ? AND seguido_id = ?`,
+      [seguidorId, userId]
+    );
+
+    await connection.commit();
+
+    res.status(200).json({ 
+      success: true,
+      message: "Dejaste de seguir al usuario",
+      isFollowing: false,
+      stats: {
+        seguidores: await obtenerContadorSeguidores(userId),
+        seguidos: await obtenerContadorSeguidos(seguidorId)
       }
-      return res
-        .status(200)
-        .json({ msg: "Ya no sigues a este usuario", isFollow: false });
     });
-  });
+
+  } catch (error) {
+    if (connection) await connection.rollback();
+    
+    console.error(`Error en dejarSeguirUsuario [UID:${seguidorId}]->[UID:${userId}]:`, error);
+    
+    res.status(500).json({
+      error: "Error al procesar la solicitud",
+      code: error.code || "UNKNOWN_ERROR",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
+
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+const seguirUsuario = async (req, res) => {
+  const seguidorId = req.payload.id;
+  const { userId } = req.params;
+  let connection;
+
+  try {
+    if (seguidorId === parseInt(userId)) {
+      return res.status(400).json({ msg: "No puedes seguirte a ti mismo" });
+    }
+
+    connection = await db_config.getConnection(); // 👈 Obtener conexión
+    await connection.beginTransaction(); // 👈 Iniciar transacción
+
+    // 1. Verificar si ya existe el seguimiento (usando la misma conexión)
+    const [result] = await connection.query(
+      "SELECT COUNT(*) AS count FROM seguidores WHERE seguidor_id = ? AND followed_id = ? FOR UPDATE", // 🔒 Bloqueo de filas
+      [seguidorId, userId]
+    );
+
+    if (result[0].count > 0) {
+      await connection.rollback(); // 👈 Deshacer transacción
+      return res.status(400).json({ msg: "Ya sigues a este usuario" });
+    }
+
+    // 2. Insertar en ambas tablas
+    await connection.query(
+      "INSERT INTO seguidores (seguidor_id, followed_id, fecha) VALUES (?, ?, NOW())",
+      [seguidorId, userId]
+    );
+
+    await connection.query(
+      "INSERT INTO seguidos (userId, seguido_id, fecha) VALUES (?, ?, NOW())",
+      [seguidorId, userId]
+    );
+
+    await connection.commit(); // 👈 Confirmar cambios
+    res.status(200).json({ msg: "Ahora sigues a este usuario", isFollow: true });
+
+  } catch (err) {
+    if (connection) await connection.rollback(); // 👈 Revertir en caso de error
+    console.error("Error en seguirUsuario:", err);
+
+    // Manejar errores de duplicidad (si hay UNIQUE constraint)
+    if (err.code === "ER_DUP_ENTRY") {
+      res.status(400).json({ msg: "Ya sigues a este usuario" });
+    } else {
+      res.status(500).json({ msg: "Error al seguir al usuario" });
+    }
+
+  } finally {
+    if (connection) connection.release(); // 👈 Liberar conexión SIEMPRE
+  }
 };
 
 const modificarBio = async (req = request, res = response) => {
@@ -584,18 +705,17 @@ const modificarBio = async (req = request, res = response) => {
   WHERE user_id = ? 
   `;
 
-  db_config.query(query, [data, userId], (err, result) => {
-    if (err) {
-      console.log(err);
-      res.status(500).json({
+  try {
+    await db_config.query(query, [data, userId])
+    return  res.status(200).json({
+      msg: "Se ha editado exitosamente su biografía",
+    });
+  } catch (error) {
+    console.log(error);
+      return res.status(500).json({
         msg: "Error al realizar esta acción",
       });
-    } else {
-      res.status(200).json({
-        msg: "Se ha editado exitosamente su biografía",
-      });
-    }
-  });
+  }
 };
 
 const mostrarPostSeguidos = async (req = request, res = response) => {
@@ -627,18 +747,18 @@ const mostrarPostSeguidos = async (req = request, res = response) => {
   LIMIT ? OFFSET ?
   `;
 
-  db_config.query(
-    query,
-    [userToken, parseInt(elementosPorPagina), offset],
-    (error, results) => {
-      if (error) {
-        return res
-          .status(500)
-          .json({ msg: "Ocurrió un error al mostrar las publicaciones" });
-      }
+  try {
+    const [results] = await db_config.query(
+      query,
+      [userToken, parseInt(elementosPorPagina), offset])
       return res.status(200).json(results);
-    }
-  );
+  } catch (error) {
+    console.log(error)
+     return res
+    .status(500)
+    .json({ msg: "Ocurrió un error al mostrar las publicaciones" });
+  }
+
 };
 
 const showListadoFollowers = async (req = request, res = response) => {
@@ -656,18 +776,18 @@ ORDER BY fecha DESC
 LIMIT ? OFFSET ?;
   `;
 
-  db_config.query(
-    query,
-    [userId, parseInt(elementosPorPagina), offset],
-    (error, results) => {
-      if (error) {
-        return res
-          .status(500)
-          .json({ msg: "Ocurrió un error al mostrar las publicaciones" });
-      }
+  try {
+    const [results] = await db_config.query(
+      query,
+      [userId, parseInt(elementosPorPagina), offset])
       return res.status(200).json(results);
-    }
-  );
+  } catch (error) {
+    console.log(error)
+   return res
+    .status(500)
+    .json({ msg: "Ocurrió un error al mostrar las publicaciones" });
+  }
+
 };
 
 const showListadoFollowing = async (req = request, res = response) => {
@@ -684,75 +804,83 @@ const showListadoFollowing = async (req = request, res = response) => {
                  ORDER BY fecha DESC
                  LIMIT ? OFFSET ?`;
 
-  db_config.query(
-    query,
-    [userId, parseInt(elementosPorPagina), offset],
-    (error, results) => {
-      if (error) {
-        return res
-          .status(500)
-          .json({ msg: "Ocurrió un error al mostrar las publicaciones" });
-      }
-      return res.status(200).json(results);
-    }
-  );
-};
-
-const recuperarPassword = async (req = request, res = response) => {
-
-  const { email } = req.body;
   try {
-
-    if(!email){
-      return res.status(400).json({msg:"Introduce un email válido y registrado en la web"})
-    }
-
-    const existeEmail =
-    "SELECT usuarios.user_id,usuarios.username,usuarios.email FROM usuarios WHERE email = ?";
-
-  db_config.query(existeEmail, [email], (error, results) => {
-    if (error) {
-      return res
-        .status(500)
-        .json({ msg: "Ocurrió un error al realizar esta acción" });
-    }if(results.length === 0){
-      return res.status(401)
-        .json({msg:"El email ingresado es inválido o no se encuentra registrado"})
-    }
-      const idUsuario = results[0].user_id;
-      const usuarioEncontrado = results[0];
-      const code = generarCodigo(8);
-      
-      const insertCode =
-        "INSERT INTO codigos_usuario (user_id,codigo,fecha_creado) VALUES (?, ?, NOW())";
-
-      db_config.query(insertCode, [idUsuario, code], (err, results) => {
-        if (err) {
-          return res
-            .status(500)
-            .json({ msg: "Ocurrió un error al procesar la solicitud" });
-        }if(results.length > 0){
-          updateCode(idUsuario,code)
-        }
-        setTimeout(() => eliminarCodigoBBDD(idUsuario), 5 * 60 * 1000);
-        sendEmailCode(usuarioEncontrado, code);
-        return res
-          .status(200)
-          .json({ msg: "El código fue enviado exitosamente" });
-      });
-    
-  });
+    const [results] = await db_config.query(
+      query,
+      [userId, parseInt(elementosPorPagina), offset])
+      return res.status(200).json(results);   
   } catch (error) {
     console.log(error)
-    return res.status(500).json({msg:"Ha ocurrido un error en el servidor"})
+    return res
+    .status(500)
+    .json({ msg: "Ocurrió un error al mostrar las publicaciones" });
   }
- 
 };
 
-const cambiarPassword = async (req = request, res = response) => {
-  const codigo = req.body.codigo;
-  const password = req.body.password;
-  const verificarPassword = req.body.repeatPassword;
+const recuperarPassword = async (req, res) => {
+  const { email } = req.body;
+  let connection;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ msg: "Introduce un email válido" });
+    }
+
+    connection = await db_config.getConnection();
+    await connection.beginTransaction(); // Iniciar transacción
+
+    // 1. Verificar si el email existe
+    const [usuarios] = await connection.query(
+      "SELECT user_id, username, email FROM usuarios WHERE email = ? FOR UPDATE",
+      [email]
+    );
+
+    if (usuarios.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ msg: "Email no registrado" });
+    }
+
+    const { user_id, username } = usuarios[0];
+    const code = generarCodigo(8);
+
+    // 2. Eliminar códigos previos (opcional pero recomendado)
+    await connection.query(
+      "DELETE FROM codigos_usuario WHERE user_id = ?",
+      [user_id]
+    );
+
+    // 3. Insertar nuevo código
+    await connection.query(
+      "INSERT INTO codigos_usuario (user_id, codigo, fecha_creado) VALUES (?, ?, NOW())",
+      [user_id, code]
+    );
+
+    await connection.commit(); // Confirmar cambios
+
+    // 4. Enviar email y programar eliminación (fuera de la transacción)
+    sendEmailCode({ email, username }, code);
+    setTimeout(() => eliminarCodigoBBDD(user_id), 5 * 60 * 1000);
+
+    res.status(200).json({ msg: "Código enviado exitosamente" });
+
+  } catch (error) {
+    if (connection) await connection.rollback(); // Revertir en caso de error
+    console.error("Error en recuperarPassword:", error);
+
+    // Manejar errores de MySQL
+    let msg = "Error al procesar la solicitud";
+    if (error.code === "ER_DUP_ENTRY") msg = "Código ya generado";
+    
+    res.status(500).json({ msg });
+
+  } finally {
+    if (connection) connection.release(); // Liberar conexión
+  }
+};
+
+const cambiarPassword = async (req, res) => {
+  const { codigo, password, repeatPassword } = req.body;
+  let connection;
 
   try {
     const errors = validationResult(req);
@@ -760,96 +888,137 @@ const cambiarPassword = async (req = request, res = response) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    if (password !== verificarPassword) {
-      return res
-        .status(400)
-        .json({ msg: "Las contraseñas introducidas no coinciden" });
+    if (password !== repeatPassword) {
+      return res.status(400).json({ msg: "Las contraseñas no coinciden" });
     }
 
     const hashPassword = await bcrypt.hash(password, 10);
+    connection = await db_config.getConnection();
+    await connection.beginTransaction(); // 👈 Iniciar transacción
 
-    const codigoCorrecto =
-      "SELECT user_id FROM codigos_usuario WHERE codigo = ?";
+    // 1. Verificar código y bloquear registro
+    const [codigos] = await connection.query(
+      `SELECT user_id FROM codigos_usuario 
+       WHERE codigo = ? FOR UPDATE`, // 🔒 Bloquea el registro
+      [codigo]
+    );
 
-    db_config.query(codigoCorrecto, [codigo], (error, results) => {
-      if (error) {
-        console.log(error);
-        return res
-          .status(500)
-          .json({ msg: "Ocurrió un error al procesar la solicitud" });
-      }
-      if (results.length === 0) {
-        return res
-          .status(401)
-          .json({ msg: "El código que has introducido es inválido" });
-      }
-      const userId = results[0].user_id;
-      const cambiarPass = `UPDATE usuarios SET 
-      password = ?
-      WHERE user_id = ?`;
+    if (codigos.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ msg: "Código inválido" });
+    }
 
-      db_config.query(
-        cambiarPass,
-        [hashPassword, userId],
-        (error, resultadoBusqueda) => {
-          if (error) {
-            console.log(error);
-            return res
-              .status(500)
-              .json({ msg: "Ocurrió un error al procesar la solicitud" });
-          }
-          eliminarCodigoBBDD(userId);
-          return res
-            .status(200)
-            .json({ msg: "Has moficiado exitosamente tu contraseña" });
-        }
-      );
-    });
+    const userId = codigos[0].user_id;
+
+    // 2. Actualizar contraseña
+    await connection.query(
+      `UPDATE usuarios SET password = ? 
+       WHERE user_id = ?`,
+      [hashPassword, userId]
+    );
+
+    // 3. Eliminar código (dentro de la transacción)
+    await connection.query(
+      `DELETE FROM codigos_usuario 
+       WHERE user_id = ?`,
+      [userId]
+    );
+
+    await connection.commit(); // ✅ Confirmar cambios
+
+    res.status(200).json({ msg: "Contraseña actualizada exitosamente" });
+
   } catch (error) {
-    console.log(error);
-    return res
-      .status(500)
-      .json({ msg: "Ha ocurrido un error, contacte con el administrador" });
+    if (connection) await connection.rollback(); // ❌ Revertir cambios
+    console.error("Error en cambiarPassword:", error);
+
+    // Manejo específico de errores
+    let msg = "Error al procesar la solicitud";
+    if (error.code === "ER_NO_REFERENCED_ROW_2") msg = "Usuario no existe";
+    
+    res.status(500).json({ msg });
+
+  } finally {
+    if (connection) connection.release(); // 🔄 Liberar conexión
   }
 };
 
-const refrescarToken = (req = request, res = response) => {
-
-  if(!req.payload) return;
-
+const refrescarToken = async (req, res) => {
   const refreshToken = req.cookies.refresh_token;
-  console.log("-------------------")
-  console.log(refreshToken)
-  if (!refreshToken) {
-    return res.status(403).send("Refresh token no proporcionado");
-  }
-  const query = `SELECT * FROM refresh_tokens WHERE token = ?`;
-  db_config.query(query, [refreshToken], (err, results) => {
-    if (err) throw err;
-    console.log(results)
-    if (results.length === 0) {
-      return res.status(403).send("Refresh token inválido");
+  let connection;
+
+  try {
+    // Validación básica
+    if (!refreshToken) {
+      return res.status(403).json({ error: "Refresh token requerido" });
     }
-    jwt.verify(refreshToken, process.env.TOKEN_KEY_REFRESH, (err, user) => {
-      if (err) return res.status(403).send("Token no válido");
-      const token = generarToken(results[0]);
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + 7);
-      const query = `UPDATE refresh_tokens SET token = ?, expiracion = ? WHERE token = ?`;
-      db_config.query(query, [token.refreshToken, expiryDate, refreshToken], (err) => {
-        if (err) throw err;
-        res.cookie("access_token", token.accessToken, {
-          httpOnly: true,
-          sameSite: "Strict",
-        });
-        res.cookie("refresh_token", token.refreshToken, {
-          httpOnly: true,
-          sameSite: "Strict",
-        });
-        res.status(200).json({ message: "Tokens renovados" });
-      });
-    });
-  });
+
+    connection = await db_config.getConnection();
+    await connection.beginTransaction(); // 🛡️ Transacción para atomicidad
+
+    // 1. Verificar token en BBDD y bloquear registro
+    const [tokens] = await connection.query(
+      `SELECT * FROM refresh_tokens 
+       WHERE token = ? FOR UPDATE`,
+      [refreshToken]
+    );
+
+    if (tokens.length === 0) {
+      await connection.rollback();
+      return res.status(403).json({ error: "Token inválido" });
+    }
+
+    // 2. Verificar firma JWT
+    const decoded = jwt.verify(refreshToken, process.env.TOKEN_KEY_REFRESH);
+    
+    // 3. Generar nuevos tokens
+    const newTokens = generarToken(tokens[0]);
+    const expiryDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 días
+
+    // 4. Actualizar token en BBDD
+    await connection.query(
+      `UPDATE refresh_tokens 
+       SET token = ?, expiracion = ? 
+       WHERE token = ?`,
+      [newTokens.refreshToken, expiryDate, refreshToken]
+    );
+
+    await connection.commit();
+
+    // 5. Configurar cookies para producción
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // 🔒 Solo HTTPS en prod
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    };
+
+    res
+      .cookie("access_token", newTokens.accessToken, cookieOptions)
+      .cookie("refresh_token", newTokens.refreshToken, cookieOptions)
+      .status(200)
+      .json({ message: "Tokens renovados" });
+
+  } catch (error) {
+    if (connection) await connection.rollback();
+    
+    console.error("Error en refrescarToken:", error);
+    
+    // Manejo específico de errores JWT
+    let statusCode = 500;
+    if (error instanceof jwt.TokenExpiredError) {
+      statusCode = 403;
+      error.message = "Token expirado";
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      statusCode = 403;
+      error.message = "Token inválido";
+    }
+
+    res.status(statusCode).json({ error: error.message });
+
+  } finally {
+    if (connection) connection.release();
+  }
 };
 
 module.exports = {

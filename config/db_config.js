@@ -1,4 +1,4 @@
-const mysql = require('mysql2');
+const mysql = require("mysql2/promise"); // 👈 Usa directamente la versión con promesas
 
 const db_config = mysql.createPool({
   host: process.env.HOST,
@@ -7,16 +7,23 @@ const db_config = mysql.createPool({
   database: process.env.DATABASE,
   waitForConnections: true,
   connectionLimit: 3,
-  queueLimit: 0,
-}).promise();
-
-db_config.getConnection((err, connection) => {
-  if (err) {
-    console.error('Error al obtener conexión del pool:', err);
-    return;
-  }
-  console.log('Conexión exitosa a la BBDD. ID de conexión:', connection.threadId);
-  connection.release(); // Libera la conexión al pool
+  queueLimit: 2,
 });
+
+// Verificación de conexión al iniciar (opcional)
+async function verificarConexion() {
+  let connection;
+  try {
+    connection = await db_config.getConnection();
+    await connection.query("SELECT 1"); // 👈 Consulta de prueba
+    console.log("✅ Conexión exitosa a la BBDD");
+  } catch (error) {
+    console.error("❌ Error al conectar a la BBDD:", error.message);
+  } finally {
+    if (connection) connection.release(); // 👈 Libera la conexión, no el pool
+  }
+}
+
+verificarConexion();
 
 module.exports = db_config;
