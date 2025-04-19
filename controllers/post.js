@@ -5,51 +5,81 @@ const fs = require("fs-extra");
 const actualizarContadorVisitas = require("../helpers/updateViews");
 const eliminarImagenCloudinary = require("../helpers/deleteImage");
 
-const agregarPost = async (req = request, res = response) => {
-  const result = await cloudinary.uploader.upload(req.file.path);
-
-  const { titulo, descripcion } = req.body;
-
-  if (!titulo.trim().length || !result) {
-    return res
-      .status(400)
-      .json({ msg: "Comprueba que tu post contenga título e imagen" });
-  }
-
-  await fs.unlink(req.file.path);
-
-  const idUsuario = req.params.id;
+const agregarPost = async (req, res) => {
+  let connection;
+  let cloudinaryResult;
 
   try {
-    const fechaPublicacion = new Date();
-    await db_config.query(
-      "INSERT INTO publicaciones SET ?",
-      {
-        titulo: titulo,
-        imagen: result.url,
-        descripcion: descripcion,
-        idUsuario: idUsuario,
-        fecha_publicacion: fechaPublicacion,
-      },
-      (err, result) => {
-        if (err) {
-          console.log(err);
-          return res
-            .status(500)
-            .json({ error: "Ocurrió un error en el servidor" });
-        }
-        console.log(result.insertId);
-        return res.status(200).json({
-          msg: "Publicación realizada con éxito",
-          idPost: result.insertId,
-        });
+      // Validaciones iniciales
+      if (!req.file) throw new Error("Archivo no proporcionado");
+      if (!req.body.titulo?.trim()) throw new Error("Título requerido");
+
+      const { titulo, descripcion = "" } = req.body;
+      const idUsuario = req.payload.userId; // 👈 ID del token JWT, no de params
+
+      // Validar autorización
+      if (!idUsuario || idUsuario !== req.payload.userId) {
+          throw new Error("No autorizado");
       }
-    );
+
+      // Iniciar transacción
+      connection = await db_config.getConnection();
+      await connection.beginTransaction();
+
+      // 1. Subir imagen con restricciones
+      cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+          folder: "posts",
+          allowed_formats: ["jpg", "png", "webp"],
+          transformation: { width: 1080, crop: "limit" },
+          resource_type: "image"
+      });
+
+      // 2. Insertar post en BBDD
+      const [result] = await connection.query(
+          `INSERT INTO publicaciones 
+           (titulo, imagen, descripcion, idUsuario, fecha_publicacion)
+           VALUES (?, ?, ?, ?, ?)`,
+          [titulo, cloudinaryResult.secure_url, descripcion, idUsuario, new Date()]
+      );
+
+      // 3. Commit y limpieza
+      await connection.commit();
+      await fs.promises.unlink(req.file.path);
+
+      res.status(201).json({
+          success: true,
+          idPost: result.insertId,
+          imagen: cloudinaryResult.secure_url
+      });
+
   } catch (error) {
-    console.log(error);
-    return res
-      .status(500)
-      .json({ msg: "Ocurrió un error, no se pudo realizar la publicación" });
+      // Rollback y limpieza de Cloudinary
+      if (connection) {
+          await connection.rollback();
+          connection.release();
+      }
+
+      if (cloudinaryResult?.public_id) {
+          await cloudinary.uploader.destroy(cloudinaryResult.public_id)
+              .catch(console.error);
+      }
+
+      // Eliminar archivo temporal si existe
+      if (req.file?.path) {
+          await fs.promises.unlink(req.file.path).catch(console.error);
+      }
+
+      // Manejo de errores profesional
+      console.error(`Error en agregarPost [UID:${req.payload.userId}]:`, error);
+      
+      const statusCode = error.message.includes("No autorizado") ? 403 : 400;
+      res.status(statusCode).json({
+          error: error.message,
+          ...(process.env.NODE_ENV === "development" && { stack: error.stack })
+      });
+
+  } finally {
+      if (connection) connection.release();
   }
 };
 

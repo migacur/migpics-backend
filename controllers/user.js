@@ -196,7 +196,7 @@ const ingresarUsuario = async (req, res) => {
       secure: true,
       maxAge: 15 * 60 * 1000 // 15 min (ejemplo)
     });
-
+    console.log(token.accessToken)
     res.cookie("refresh_token", token.refreshToken, {
       httpOnly: true,
       sameSite: "None",
