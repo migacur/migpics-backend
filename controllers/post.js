@@ -5,81 +5,60 @@ const fs = require("fs-extra");
 const actualizarContadorVisitas = require("../helpers/updateViews");
 const eliminarImagenCloudinary = require("../helpers/deleteImage");
 
-const agregarPost = async (req, res) => {
-  let connection;
-  let cloudinaryResult;
+const agregarPost = async (req = request, res = response) => {
+  const { titulo, descripcion } = req.body;
+  const idUsuario = req.params.id;
+
+  // 1. Validaciones iniciales
+  if (!titulo?.trim() || !req.file) {
+    return res.status(400).json({ msg: "Se requiere título e imagen" });
+  }
+
+  if (!req.payload?.id || req.payload.id !== idUsuario) {
+    return res.status(401).json({ msg: "Usuario no autorizado" });
+  }
 
   try {
-      // Validaciones iniciales
-      if (!req.file) throw new Error("Archivo no proporcionado");
-      if (!req.body.titulo?.trim()) throw new Error("Título requerido");
-
-      const { titulo, descripcion = "" } = req.body;
-      const idUsuario = req.payload.userId; // 👈 ID del token JWT, no de params
-
-      // Validar autorización
-      if (!idUsuario || idUsuario !== req.payload.userId) {
-          throw new Error("No autorizado");
+    // 2. Subir imagen directamente desde el buffer a Cloudinary
+    const result = await cloudinary.uploader.upload(
+      `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`, 
+      {
+        folder: "posts", // Opcional: organizar en carpetas en Cloudinary
+        resource_type: "auto"
       }
+    );
 
-      // Iniciar transacción
-      connection = await db_config.getConnection();
-      await connection.beginTransaction();
+    // 3. Insertar en base de datos con promesas
+    const fechaPublicacion = new Date();
+    const [dbResult] = await db_config.promise().query(
+      "INSERT INTO publicaciones SET ?",
+      {
+        titulo: titulo,
+        imagen: result.secure_url, // Usar URL segura (https)
+        descripcion: descripcion,
+        idUsuario: idUsuario,
+        fecha_publicacion: fechaPublicacion,
+      }
+    );
 
-      // 1. Subir imagen con restricciones
-      cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-          folder: "posts",
-          allowed_formats: ["jpg", "png", "webp"],
-          transformation: { width: 1080, crop: "limit" },
-          resource_type: "image"
-      });
-
-      // 2. Insertar post en BBDD
-      const [result] = await connection.query(
-          `INSERT INTO publicaciones 
-           (titulo, imagen, descripcion, idUsuario, fecha_publicacion)
-           VALUES (?, ?, ?, ?, ?)`,
-          [titulo, cloudinaryResult.secure_url, descripcion, idUsuario, new Date()]
-      );
-
-      // 3. Commit y limpieza
-      await connection.commit();
-      await fs.promises.unlink(req.file.path);
-
-      res.status(201).json({
-          success: true,
-          idPost: result.insertId,
-          imagen: cloudinaryResult.secure_url
-      });
+    // 4. Respuesta exitosa
+    res.status(201).json({
+      msg: "Publicación realizada con éxito",
+      idPost: dbResult.insertId,
+    });
 
   } catch (error) {
-      // Rollback y limpieza de Cloudinary
-      if (connection) {
-          await connection.rollback();
-          connection.release();
-      }
+    console.error("Error en agregarPost:", error);
+    
+    // 5. Eliminar imagen de Cloudinary si falló la DB
+    if (result?.public_id) {
+      await cloudinary.uploader.destroy(result.public_id);
+    }
 
-      if (cloudinaryResult?.public_id) {
-          await cloudinary.uploader.destroy(cloudinaryResult.public_id)
-              .catch(console.error);
-      }
-
-      // Eliminar archivo temporal si existe
-      if (req.file?.path) {
-          await fs.promises.unlink(req.file.path).catch(console.error);
-      }
-
-      // Manejo de errores profesional
-      console.error(`Error en agregarPost [UID:${req.payload.userId}]:`, error);
-      
-      const statusCode = error.message.includes("No autorizado") ? 403 : 400;
-      res.status(statusCode).json({
-          error: error.message,
-          ...(process.env.NODE_ENV === "development" && { stack: error.stack })
-      });
-
-  } finally {
-      if (connection) connection.release();
+    res.status(500).json({ 
+      msg: error.sqlMessage ? "Error en base de datos" : "Error al procesar imagen",
+      error: process.env.NODE_ENV === "development" ? error.message : null
+    });
   }
 };
 
