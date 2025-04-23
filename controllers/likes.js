@@ -7,34 +7,38 @@ const darLikePost = async (req, res) => {
     let connection;
   
     try {
-        // Validaciones básicas
         if (!postId || !userId) {
             return res.status(400).json({ error: "Datos incompletos" });
         }
   
         connection = await db_config.getConnection();
         await connection.beginTransaction();
-  
-        // 1. Verificar existencia de usuario y publicación (optimizado con Promise.all)
-        const [[[usuario]], [[publicacion]]] = await Promise.all([
+
+        // 1. VERIFICACIÓN DE EXISTENCIA (CORREGIDO)
+        const [[userCheck], [[publicacion]]] = await Promise.all([
             connection.query("SELECT 1 FROM usuarios WHERE user_id = ?", [userId]),
             connection.query("SELECT 1 FROM publicaciones WHERE publicacion_id = ?", [postId])
         ]);
-  
-        if (!usuario || !publicacion.length) {
-            throw new Error(usuario ? "Publicación no existe" : "Usuario no existe");
+
+        // Verificar resultados correctamente
+        if (!userCheck?.length || !publicacion?.length) {
+            throw new Error(
+                !userCheck?.length 
+                ? "Usuario no existe" 
+                : "Publicación no existe"
+            );
         }
-  
-        // 2. Bloquear fila y verificar like existente (variable renombrada a existingLike)
+
+        // 2. VERIFICAR LIKE EXISTENTE
         const [existingLike] = await connection.query(
             `SELECT * FROM likes_publicaciones 
              WHERE publicacion_id = ? AND user_id = ? FOR UPDATE`,
             [postId, userId]
         );
   
-        // 3. Operación like/unlike con fecha manual (formato MySQL)
+        // 3. OPERACIÓN LIKE/UNLIKE
         const mysqlDateTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  
+        
         if (existingLike.length > 0) {
             await connection.query(
                 `DELETE FROM likes_publicaciones 
@@ -50,7 +54,7 @@ const darLikePost = async (req, res) => {
             );
         }
   
-        // 4. Obtener nuevo contador (variable renombrada a totalLikes)
+        // 4. OBTENER CONTADOR ACTUALIZADO
         const [[{ likes: totalLikes }]] = await connection.query(
             `SELECT COUNT(*) AS likes 
              FROM likes_publicaciones 
@@ -61,32 +65,44 @@ const darLikePost = async (req, res) => {
         await connection.commit();
   
         res.status(200).json({
-            isLiked: !existingLike.length, // Estado inverso al original
+            isLiked: !existingLike.length,
             likes: totalLikes
         });
   
     } catch (error) {
+        // MANEJO DE ERRORES CORREGIDO (EVITA DOBLE RELEASE)
         if (connection) {
             await connection.rollback();
             connection.release();
+            connection = null; // 👈 Marca como liberada
         }
-  
+
         console.error(`Error en darLikePost [UID:${userId}, Post:${postId}]:`, error);
-  
+        console.log('Resultados de verificación:', {
+            userCheck: userCheck?.length,
+            publicacion: publicacion?.length
+        });
+
         const errorResponse = {
-            error: "Error al procesar el like",
+            error: error.message.includes("no existe") 
+                ? error.message 
+                : "Error al procesar el like",
             ...(process.env.NODE_ENV === "development" && { 
-                detalle: error.message,
                 stack: error.stack 
             })
         };
   
-        res.status(500).json(errorResponse);
+        res.status(
+            error.message.includes("no existe") ? 404 : 500
+        ).json(errorResponse);
   
     } finally {
-        if (connection && connection.release) connection.release();
+        // LIBERACIÓN SEGURA (SOLO SI NO SE LIBERÓ ANTES)
+        if (connection && !connection._closed && connection.release) {
+            connection.release();
+        }
     }
-  };
+};
 module.exports = {
     darLikePost
 }
