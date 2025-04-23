@@ -7,7 +7,9 @@ const db_config = mysql.createPool({
   database: process.env.DATABASE,
   waitForConnections: true,
   connectionLimit: 3,
-  queueLimit: 2,
+  queueLimit: 0,
+  idleTimeout: 10000,    // Cierra conexiones inactivas después de 10s
+  enableKeepAlive: true,
 });
 
 // Verificación de conexión al iniciar (opcional)
