@@ -9,59 +9,82 @@ dotenv.config();
 
 const app = express();
 
-// Importación de rutas
-const userRouter = require("./routes/user");
-const postRouter = require("./routes/post");
-const likeRouter = require("./routes/likes");
-const TopUserRouter = require("./routes/top_users");
-const TopPostRouter = require("./routes/top_posts");
-const downloadRouter = require("./routes/downloads");
-const favRouter = require("./routes/favorites");
-const msgRouter = require("./routes/mensajes");
-const notificacionesRouter = require("./routes/notificaciones");
+// ================== 🛡️ Configuración de Seguridad Mejorada ==================
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://migpics.onrender.com"
+];
 
-// Configuración del puerto
-const PORT = process.env.PORT || 3000;
-
-// Configuración de CORS
-const allowedOrigins = ["http://localhost:3000","https://migpics.onrender.com"];
-
+// Configuración CORS para producción/desarrollo
 app.use(cors({
-  origin: (origin, callback) => {
-    if (allowedOrigins.includes(origin) || !origin) {
+  origin: function (origin, callback) {
+    // En desarrollo permite cualquier origen (útil para pruebas locales)
+    if (process.env.NODE_ENV === "development") {
+      return callback(null, true);
+    }
+
+    // En producción: validación estricta
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error("Not allowed by CORS"));
+      console.error(`🚨 Intento de acceso desde origen no permitido: ${origin}`);
+      callback(new Error("Acceso no autorizado por políticas CORS"));
     }
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  credentials: true,
+  optionsSuccessStatus: 204
 }));
 
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", req.headers.origin);
-  res.header("Access-Control-Allow-Credentials", "true");
-  next();
-});
+app.set("trust proxy", 1); // Necesario para cookies en entornos cloud
 
+// ================================================================
+
+// Middlewares esenciales
 app.use(cookieParser());
 app.use(express.json());
 
-// Uso de rutas
-app.use(userRouter);
-app.use(postRouter);
-app.use(likeRouter);
-app.use(TopUserRouter);
-app.use(TopPostRouter);
-app.use(downloadRouter);
-app.use(favRouter);
-app.use(msgRouter);
-app.use(notificacionesRouter);
+// Middleware de diagnóstico (solo desarrollo)
+if (process.env.NODE_ENV !== "production") {
+  app.use((req, res, next) => {
+    console.log("🔍 [DEV] Headers recibidos:", req.headers);
+    console.log("🍪 Cookies recibidas:", req.cookies);
+    next();
+  });
+}
 
-const server = http.createServer(app);
-//require('./config/socket')(server); 
+// Importación y uso de rutas
+const routers = [
+  require("./routes/user"),
+  require("./routes/post"),
+  require("./routes/likes"),
+  require("./routes/top_users"),
+  require("./routes/top_posts"),
+  require("./routes/downloads"),
+  require("./routes/favorites"),
+  require("./routes/mensajes"),
+  require("./routes/notificaciones")
+];
+
+routers.forEach(router => app.use("/api", router)); // 👈 Prefijo /api para todas las rutas
+
+// Manejo centralizado de errores
+app.use((err, req, res, next) => {
+  console.error("🔥 Error global:", err);
+  res.status(err.status || 500).json({
+    error: process.env.NODE_ENV === "production" 
+      ? "Error interno del servidor" 
+      : err.message
+  });
+});
+
 // Inicio del servidor
+const server = http.createServer(app);
+const PORT = process.env.PORT || 3000;
+
 server.listen(PORT, () => {
-  console.log(`Servidor funcionando en el puerto: ${PORT}`);
+  console.log(`🚀 Servidor funcionando en puerto: ${PORT}`);
+  console.log(`🔐 Entorno: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌍 Orígenes permitidos: ${allowedOrigins.join(", ")}`);
 });

@@ -192,18 +192,37 @@ const ingresarUsuario = async (req, res) => {
     // Setear cookies
     res.cookie("access_token", token.accessToken, {
       httpOnly: true,
+      secure: true, // Obligatorio para SameSite=None
       sameSite: "None",
-      secure: true,
-      maxAge: 15 * 60 * 1000 // 15 min (ejemplo)
+      domain: process.env.NODE_ENV === "production" 
+        ? ".onrender.com" // 👈 Dominio padre para subdominios
+        : undefined, // Localhost no necesita dominio
+      maxAge: 15 * 60 * 1000,
+      path: "/"
     });
+
     console.log(token.accessToken)
+
+    res.cookie("access_token", token.refreshToken, {
+      httpOnly: true,
+      secure: true, // Obligatorio para SameSite=None
+      sameSite: "None",
+      domain: process.env.NODE_ENV === "production" 
+        ? ".onrender.com" // 👈 Dominio padre para subdominios
+        : undefined, // Localhost no necesita dominio
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
+      path: "/"
+    });
+
+    console.log(token.refreshToken)
+/*
     res.cookie("refresh_token", token.refreshToken, {
       httpOnly: true,
       sameSite: "None",
       secure: true,
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 días
     });
-
+*/
     return res.status(200).json({
       user: {
         id: user.user_id,
