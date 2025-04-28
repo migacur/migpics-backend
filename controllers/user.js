@@ -189,32 +189,25 @@ const ingresarUsuario = async (req, res) => {
       connection.release();
     }
 
-    // Setear cookies
-    res.cookie("access_token", token.accessToken, {
-      httpOnly: true,
-      secure: true, // Obligatorio para SameSite=None
-      sameSite: "None",
-      domain: process.env.NODE_ENV === "production" 
-        ? ".onrender.com" // 👈 Dominio padre para subdominios
-        : undefined, // Localhost no necesita dominio
-      maxAge: 15 * 60 * 1000,
-      path: "/"
-    });
+  // Cookie para el Access Token
+res.cookie("access_token", token.accessToken, {
+  httpOnly: true,
+  secure: true, 
+  sameSite: "None",
+  domain: process.env.NODE_ENV === "production" ? ".onrender.com" : undefined,
+  maxAge: 15 * 60 * 1000, // 15 minutos
+  path: "/"
+});
 
-    console.log(token.accessToken)
-
-    res.cookie("access_token", token.refreshToken, {
-      httpOnly: true,
-      secure: true, // Obligatorio para SameSite=None
-      sameSite: "None",
-      domain: process.env.NODE_ENV === "production" 
-        ? ".onrender.com" // 👈 Dominio padre para subdominios
-        : undefined, // Localhost no necesita dominio
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
-      path: "/"
-    });
-
-    console.log(token.refreshToken)
+// Cookie para el Refresh Token (nombre diferente)
+res.cookie("refresh_token", token.refreshToken, { // 👈 refresh_token
+  httpOnly: true,
+  secure: true,
+  sameSite: "None",
+  domain: process.env.NODE_ENV === "production" ? ".onrender.com" : undefined,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
+  path: "/" // 👈 Ruta específica para refresh
+});
 /*
     res.cookie("refresh_token", token.refreshToken, {
       httpOnly: true,
