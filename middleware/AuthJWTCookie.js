@@ -11,6 +11,7 @@ const authMiddleware = (req, res, next) => {
     if (err) {
       return res.status(403).send('Prohibido el acceso');
     }
+    console.log(`Los datos del usuario logueado son: ${user}`)
     req.payload = user;
     next();
   });
