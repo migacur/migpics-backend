@@ -208,6 +208,8 @@ res.cookie("refresh_token", token.refreshToken, { // 👈 refresh_token
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
   path: "/" // 👈 Ruta específica para refresh
 });
+
+console.log("Headers de cookies enviados:", res.getHeaders()["set-cookie"]);
 /*
     res.cookie("refresh_token", token.refreshToken, {
       httpOnly: true,
