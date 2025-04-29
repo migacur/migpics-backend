@@ -18,8 +18,8 @@ const darLikePost = async (req=request, res=response) => {
 
         // 1. VERIFICACIÓN CORREGIDA (usa resultados directos)
         const [userResults, publicationResults] = await Promise.all([
-            connection.query("SELECT id FROM usuarios WHERE id = ?", [userId]),
-            connection.query("SELECT id FROM publicaciones WHERE id = ?", [postId])
+            connection.query("SELECT user_id FROM usuarios WHERE user_id = ?", [userId]),
+            connection.query("SELECT publicacion_id FROM publicaciones WHERE publicacion_id = ?", [postId])
         ]);
 
         userCheck = userResults[0];
