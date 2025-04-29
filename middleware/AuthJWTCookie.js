@@ -9,9 +9,10 @@ const authMiddleware = (req, res, next) => {
 
   jwt.verify(token, process.env.TOKEN_KEY, (err, user) => {
     if (err) {
+      console.log(err)
       return res.status(403).send('Prohibido el acceso');
     }
-    console.log(`Los datos del usuario logueado son: ${user}`)
+    console.log(`[${new Date().toISOString()}] Usuario autenticado:`, user);
     req.payload = user;
     next();
   });
