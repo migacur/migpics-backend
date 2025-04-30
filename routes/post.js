@@ -19,7 +19,7 @@ const uploadFileMiddleware = require("../middleware/uploadFile");
 const authMiddleware = require("../middleware/AuthJWTCookie");
 const postRouter = Router();
 
-postRouter.post('/agregar-post/:id',[uploadFileMiddleware,authMiddleware],agregarPost)
+postRouter.post('/agregar-post/:id',[authMiddleware,uploadFileMiddleware],agregarPost)
 postRouter.get('/', mostrarPostRecientes)
 postRouter.get('/tendencias', mostrarTendencias)
 postRouter.get('/post/:postId',authMiddleware,mostrarPostPorId)
