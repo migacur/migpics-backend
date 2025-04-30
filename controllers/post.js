@@ -8,9 +8,9 @@ const eliminarImagenCloudinary = require("../helpers/deleteImage");
 const agregarPost = async (req = request, res = response) => {
   const { titulo, descripcion } = req.body;
   const idUsuario = parseInt(req.params.id);
-  console.log(idUsuario, req.payload.id)
-  console.log(typeof idUsuario, typeof req.payload.id)
-  // 1. Validaciones iniciales
+  let result; // 👈 1. Declarar variable fuera del try
+
+  // Validaciones iniciales
   if (!titulo?.trim() || !req.file) {
     return res.status(400).json({ msg: "Se requiere título e imagen" });
   }
@@ -20,29 +20,27 @@ const agregarPost = async (req = request, res = response) => {
   }
 
   try {
-    // 2. Subir imagen directamente desde el buffer a Cloudinary
-    const result = await cloudinary.uploader.upload(
+    // 2. Subir imagen a Cloudinary
+    result = await cloudinary.uploader.upload(
       `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`, 
       {
-        folder: "posts", // Opcional: organizar en carpetas en Cloudinary
+        folder: "posts",
         resource_type: "auto"
       }
     );
 
-    // 3. Insertar en base de datos con promesas
-    const fechaPublicacion = new Date();
-    const [dbResult] = await db_config.promise().query(
+    // 3. Conexión a DB corregida (usando mysql2/promise)
+    const [dbResult] = await db_config.query(
       "INSERT INTO publicaciones SET ?",
       {
         titulo: titulo,
-        imagen: result.secure_url, // Usar URL segura (https)
+        imagen: result.secure_url,
         descripcion: descripcion,
         idUsuario: idUsuario,
-        fecha_publicacion: fechaPublicacion,
+        fecha_publicacion: new Date(),
       }
     );
 
-    // 4. Respuesta exitosa
     res.status(201).json({
       msg: "Publicación realizada con éxito",
       idPost: dbResult.insertId,
@@ -51,15 +49,24 @@ const agregarPost = async (req = request, res = response) => {
   } catch (error) {
     console.error("Error en agregarPost:", error);
     
-    // 5. Eliminar imagen de Cloudinary si falló la DB
+    // 4. Eliminar imagen solo si se subió
     if (result?.public_id) {
       await cloudinary.uploader.destroy(result.public_id);
     }
 
-    res.status(500).json({ 
-      msg: error.sqlMessage ? "Error en base de datos" : "Error al procesar imagen",
-      error: process.env.NODE_ENV === "development" ? error.message : null
-    });
+    // 5. Manejo de errores mejorado
+    const errorResponse = {
+      msg: error.sqlMessage 
+        ? "Error en base de datos" 
+        : "Error al procesar imagen"
+    };
+
+    if (process.env.NODE_ENV === "development") {
+      errorResponse.error = error.message;
+      errorResponse.stack = error.stack;
+    }
+
+    res.status(500).json(errorResponse);
   }
 };
 
