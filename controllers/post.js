@@ -8,8 +8,8 @@ const eliminarImagenCloudinary = require("../helpers/deleteImage");
 const agregarPost = async (req = request, res = response) => {
   const { titulo, descripcion } = req.body;
   const idUsuario = req.params.id;
-  console.log(titulo)
-  console.log(req)
+  console.log(idUsuario, req.payload.id)
+  console.log(typeof idUsuario, typeof req.payload.id)
   // 1. Validaciones iniciales
   if (!titulo?.trim() || !req.file) {
     return res.status(400).json({ msg: "Se requiere título e imagen" });
