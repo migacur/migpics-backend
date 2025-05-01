@@ -379,7 +379,7 @@ const mostrarComentariosUsuario = async (req, res) => {
   try {
     const { username } = req.params;
     const pagina = req.query.pagina || 1;
-    const elementosPorPagina = req.query.elementosPorPagina || 10;
+    const elementosPorPagina = parseInt(req.query.elementosPorPagina) || 10;
     const offset = (pagina - 1) * elementosPorPagina;
 
     // Validaciones

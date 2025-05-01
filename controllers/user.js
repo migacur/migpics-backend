@@ -332,6 +332,7 @@ const cambiarAvatar = async (req = request, res = response) => {
 
     res.status(200).json({ 
       success: true,
+      msg:"Se ha modificado tu avatar",
       avatar: archivo.secure_url
     });
 
