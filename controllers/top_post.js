@@ -8,12 +8,14 @@ const obtenerTopLikes = async(req=request,res=response) => {
     GROUP BY p.publicacion_id, p.titulo
     ORDER BY total_likes DESC LIMIT 10`;
 
-    db_config.query(query, (err,result) => {
-        if(err){
-            return res.status(500).json({msg: 'Ocurrió un error al mostrar los datos, vuelva a intentarlo'})
-        }
-        return res.status(200).json(result)
-    })
+    try {
+        const [results] = await db_config.query(query)
+        return res.status(200).json(results)
+    } catch (error) {
+        console.log(error)
+        return res.status(500)
+            .json({msg: 'Ocurrió un error al mostrar los datos, vuelva a intentarlo'})
+    }
 }
 
 const obtenerTopComentarios = async(req=request,res=response) => {
@@ -26,12 +28,14 @@ const obtenerTopComentarios = async(req=request,res=response) => {
         ORDER BY total_comentarios+total_respuestas DESC LIMIT 10;
     `;
 
-    db_config.query(query, (err,result) => {
-        if(err){
-            return res.status(500).json({msg: 'Ocurrió un error al mostrar los datos, vuelva a intentarlo'})
-        }
-        return res.status(200).json(result)
-    })
+    try {
+        const [results] = await db_config.query(query)
+        return res.status(200).json(results)
+    } catch (error) {
+        console.log(error)
+        return res.status(500)
+            .json({msg: 'Ocurrió un error al mostrar los datos, vuelva a intentarlo'})
+    }
 }
 
 module.exports = {

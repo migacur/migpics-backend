@@ -9,12 +9,15 @@ const showTopPostUsers = async(req=request, res=response) => {
 	GROUP BY usuarios.user_id
     ORDER BY total_post DESC LIMIT 10;`;
 
-    db_config.query(query, (err,result) => {
-        if(err){
-            return res.status(500).json({msg: 'Ocurrió un error al mostrar los datos, vuelva a intentarlo'})
-        }
-        return res.status(200).json(result)
-    })
+    try {
+        const [results] = await db_config.query(query)
+        return res.status(200).json(results)
+    } catch (error) {
+        console.log(error)
+        return res.status(500)
+            .json({msg: 'Ocurrió un error al mostrar los datos, vuelva a intentarlo'})
+    }
+
 }
 
 const showTopLikeUsers = async(req=request, res=response) => {
@@ -26,13 +29,16 @@ const showTopLikeUsers = async(req=request, res=response) => {
     ON usuarios.user_id = publicaciones.idUsuario
     GROUP BY usuarios.username
     ORDER BY likes_totales DESC LIMIT 10`;
+    
+    try {
+        const [results] = await db_config.query(query)
+        return res.status(200).json(results)
+    } catch (error) {
+        console.log(error)
+        return res.status(500)
+            .json({msg: 'Ocurrió un error al mostrar los datos, vuelva a intentarlo'})
+    }
 
-    db_config.query(query, (err,result) => {
-        if(err){
-            return res.status(500).json({msg: 'Ocurrió un error al mostrar los datos, vuelva a intentarlo'})
-        }
-        return res.status(200).json(result)
-    })
 }
 
 module.exports = {

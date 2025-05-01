@@ -463,7 +463,7 @@ const eliminarPublicacion = async(req, res) => {
       "DELETE FROM publicaciones WHERE publicacion_id = ? AND idUsuario = ?";
 
     await db_config.query(query, [postId, userId])
-    eliminarImagenCloudinary(imagenUrl)
+    await eliminarImagenCloudinary(imagenUrl)
       return res
         .status(200)
         .json({ msg: "La publicación fue eliminada exitosamente" });
