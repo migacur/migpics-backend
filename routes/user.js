@@ -90,7 +90,7 @@ userRouter.get(
 );
 userRouter.put(
   "/change-avatar/:id",
-  [authMiddleware,uploadFileMiddleware],
+  [uploadFileMiddleware,authMiddleware],
   cambiarAvatar
 );
 userRouter.post("/forgot-password", recuperarPassword);

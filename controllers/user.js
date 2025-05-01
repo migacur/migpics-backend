@@ -284,52 +284,51 @@ const cerrarSesion = async (req, res) => {
   }
 };
 
-const cambiarAvatar = async (req=request, res=response) => {
+const cambiarAvatar = async (req = request, res = response) => {
   const { id } = req.params;
   const userOn = req.payload.id;
   let connection;
 
   try {
     // Validaciones iniciales
-    if (!req.file){
-      return res.status(400).json({msg:"Avatar no proporcionado"})
+    if (!req.file) {
+      return res.status(400).json({ msg: "Avatar no proporcionado" });
     }
-    if (parseInt(id) !== userOn){
-      return res.status(401).json({msg:"Usuario no autorizado"})
+    if (parseInt(id) !== userOn) {
+      return res.status(401).json({ msg: "Usuario no autorizado" });
     }
 
-    // Iniciar transacción
     connection = await db_config.getConnection();
     await connection.beginTransaction();
 
-    // 1. Subir imagen a Cloudinary
-    const archivo = await cloudinary.uploader.upload(req.file.path, {
+    // 1. Subir imagen a Cloudinary desde el buffer
+    const b64 = Buffer.from(req.file.buffer).toString("base64");
+    const dataURI = `data:${req.file.mimetype};base64,${b64}`;
+    
+    const archivo = await cloudinary.uploader.upload(dataURI, {
       folder: "avatars",
       allowed_formats: ["jpg", "png", "webp"]
     });
 
-    // 2. Obtener avatar actual
+    // 2. Obtener y eliminar avatar antiguo
     const [usuarios] = await connection.query(
       "SELECT avatar FROM usuarios WHERE user_id = ? FOR UPDATE",
       [id]
     );
     if (usuarios.length === 0) throw new Error("Usuario no existe");
 
-    // 3. Eliminar avatar antiguo (si existe)
     const avatarAnterior = usuarios[0].avatar;
     if (avatarAnterior) {
       await eliminarImagenCloudinary(avatarAnterior); 
     }
 
-    // 4. Actualizar en BBDD
+    // 3. Actualizar en BBDD
     await connection.query(
       "UPDATE usuarios SET avatar = ? WHERE user_id = ?",
       [archivo.secure_url, id]
     );
 
-    // 5. Commit y limpieza
     await connection.commit();
-    await fs.promises.unlink(req.file.path); 
 
     res.status(200).json({ 
       success: true,
@@ -337,15 +336,9 @@ const cambiarAvatar = async (req=request, res=response) => {
     });
 
   } catch (error) {
-    // Rollback y manejo de errores
     if (connection) {
       await connection.rollback();
       connection.release();
-    }
-
-    // Eliminar archivo temporal si existe
-    if (req.file?.path) {
-      await fs.promises.unlink(req.file.path).catch(console.error);
     }
 
     console.error(`Error en cambiarAvatar [UID:${id}]:`, error);
