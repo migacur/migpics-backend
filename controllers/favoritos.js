@@ -10,7 +10,7 @@ const agregarFavoritos = async (req = request, res = response) => {
       return res.status(401).json({ msg: 'No autorizado' });
   }
 
-  if(!post || !userId){
+  if(!postId || !userId){
     return res.status(400)
             .json({ msg: 'No se pudo realizar esta acción por falta de datos' });
   }
