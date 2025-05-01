@@ -284,15 +284,19 @@ const cerrarSesion = async (req, res) => {
   }
 };
 
-const cambiarAvatar = async (req, res) => {
+const cambiarAvatar = async (req=request, res=response) => {
   const { id } = req.params;
-  const userOn = req.payload?.id; // ID del usuario autenticado
+  const userOn = req.payload.id;
   let connection;
 
   try {
     // Validaciones iniciales
-    if (!req.file) throw new Error("Archivo no proporcionado");
-    if (parseInt(id) !== userOn) throw new Error("No autorizado");
+    if (!req.file){
+      return res.status(400).json({msg:"Avatar no proporcionado"})
+    }
+    if (parseInt(id) !== userOn){
+      return res.status(401).json({msg:"Usuario no autorizado"})
+    }
 
     // Iniciar transacción
     connection = await db_config.getConnection();
