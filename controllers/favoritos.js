@@ -2,11 +2,16 @@ const { request, response } = require("express");
 const db_config = require("../config/db_config");
 
 const agregarFavoritos = async (req = request, res = response) => {
-  const { postId } = parseInt(req.params);
+  const postId = parseInt(req.params);
   const userId = req.body.data.id;
-console.log(req.params)
+  console.log("-----------")
+  console.log(req.params)
 console.log("-----------")
-console.log(req)
+console.log(req.params.postId)
+console.log("-----------")
+console.log(req.params.postId[0])
+console.log("-----------")
+
   // Validaciones iniciales
   if (!req.payload.id) {
       return res.status(401).json({ msg: 'No autorizado' });
