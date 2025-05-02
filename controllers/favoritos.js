@@ -2,7 +2,7 @@ const { request, response } = require("express");
 const db_config = require("../config/db_config");
 
 const agregarFavoritos = async (req = request, res = response) => {
-  const postId = parseInt(req.params);
+  const postId = parseInt(req.params.postId);
   const userId = req.body.data.id;
   console.log("-----------")
   console.log(req.params)
