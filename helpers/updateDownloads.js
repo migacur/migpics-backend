@@ -1,15 +1,15 @@
 const db_config = require("../config/db_config");
 
-function actualizarDescargas(publicacionId) {
-    const query = `UPDATE publicaciones SET descargas = descargas + 1 WHERE publicacion_id = ${publicacionId}`;
-  
-    db_config.query(query, (error, results) => {
-      if (error) {
-        console.error('Error al actualizar el contador de descargas: ', error);
-      } else {
-        console.log('Actualizado el contador de descargas');
-      }
-    });
+const actualizarDescargas = async (postId) => {
+  try {
+      await db_config.query(
+          'UPDATE publicaciones SET descargas = descargas + 1 WHERE idPublicacion = ?',
+          [postId]
+      );
+  } catch (error) {
+      console.error('Error en actualizarDescargas:', error);
+      throw error;
   }
+};
 
  module.exports = actualizarDescargas;
