@@ -4,7 +4,9 @@ const db_config = require("../config/db_config");
 const agregarFavoritos = async (req = request, res = response) => {
   const { postId } = parseInt(req.params);
   const userId = req.body.data.id;
-console.log(postId, req.body)
+console.log(req.params)
+console.log("-----------")
+console.log(req)
   // Validaciones iniciales
   if (!req.payload.id) {
       return res.status(401).json({ msg: 'No autorizado' });
