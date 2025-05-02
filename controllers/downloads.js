@@ -29,7 +29,6 @@ const descargarImagen = async (req = request, res = response) => {
         imageResponse.data.on('end', async () => {
             try {
                 await actualizarDescargas(parseInt(postId));
-                return res.status(200).json({msg:"Se ha descargado la imagen correctamente"})
             } catch (error) {
                 console.error('Error al actualizar descargas:', error);
             }
