@@ -10,23 +10,26 @@ const descargarImagen = async (req = request, res = response) => {
     try {
         const imageUrl = req.body.url;
         const ext = imageUrl.split('.').pop();
+
+        if(!imageUrl){
+            return res.status(400).json({msg:"NO se encontró la imagen"})
+        }
         
-        // Obtener la imagen
         const imageResponse = await axios.get(imageUrl, { 
             responseType: 'stream' 
         });
   
-        // Configurar headers
+      
         res.setHeader('Content-Disposition', `attachment; filename="${randomUrl}.${ext}"`);
         res.setHeader('Content-Type', imageResponse.headers['content-type']);
   
-        // Pipe de la imagen
+    
         imageResponse.data.pipe(res);
   
-        // Actualizar descargas después de que el pipe finalice
         imageResponse.data.on('end', async () => {
             try {
-                await actualizarDescargas(postId); // <--- Asegurar que actualizarDescargas use promesas
+                await actualizarDescargas(parseInt(postId));
+                return res.status(200).json({msg:"Se ha descargado la imagen correctamente"})
             } catch (error) {
                 console.error('Error al actualizar descargas:', error);
             }
@@ -34,7 +37,7 @@ const descargarImagen = async (req = request, res = response) => {
   
     } catch (error) {
         console.error(error);
-        if (!res.headersSent) { // Verificar si la respuesta no se ha enviado
+        if (!res.headersSent) {
             res.status(500).json({ msg: 'Error al descargar la imagen' });
         }
     }
