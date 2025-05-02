@@ -28,7 +28,7 @@ console.log("-----------")
   try {
       // Verificar si el post existe
       const [post] = await connection.query(
-          'SELECT idPublicacion FROM publicaciones WHERE idPublicacion = ?',
+          'SELECT publicacion_id FROM publicaciones WHERE publicacion_id = ?',
           [postId]
       );
 
