@@ -619,12 +619,8 @@ const dejarSeguirUsuario = async (req, res) => {
 
     res.status(200).json({ 
       success: true,
-      message: "Dejaste de seguir al usuario",
+      msg: "Dejaste de seguir a este usuario",
       isFollowing: false,
-      stats: {
-        seguidores: await obtenerContadorSeguidores(userId),
-        seguidos: await obtenerContadorSeguidos(seguidorId)
-      }
     });
 
   } catch (error) {
