@@ -645,7 +645,8 @@ const dejarSeguirUsuario = async (req, res) => {
 
 const seguirUsuario = async (req, res) => {
   const seguidorId = req.payload.id;
-  const userId  = parseInt(req.params.userId);
+ // const userId  = parseInt(req.params.userId);
+ const userId  = parseInt(req.body.userId);
   let connection;
 console.log(seguidorId,userId)
   try {

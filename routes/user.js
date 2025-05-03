@@ -67,7 +67,7 @@ userRouter.get(
   authMiddleware,
   mostrarPublicacionesFavoritas
 );
-userRouter.post("/seguir-usuario/:userId", authMiddleware, seguirUsuario);
+userRouter.post("/seguir-usuario", authMiddleware, seguirUsuario);
 userRouter.delete(
   "/deseguir-usuario/:userId",
   authMiddleware,
