@@ -20,9 +20,9 @@ const dataUsuarioMsg = async(req=request,res=response) => {
 
 const enviarMsgUsuario = async (req = request, res = response) => {
   const userLogueado = req.payload.id;
-  const { userId } = parseInt(req.params);
+  const userId  = parseInt(req.params.userId);
   const msg = req.body.mensaje?.trim();
-
+console.log(req.params)
   // Validaciones iniciales
   if (!msg || msg.length < 5) {
       return res.status(400).json({ msg: 'El mensaje debe tener al menos 5 caracteres' });
