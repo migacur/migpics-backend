@@ -573,14 +573,14 @@ const seguirUsuario = async (req = request, res = response) => {
 }; */
 
 const dejarSeguirUsuario = async (req, res) => {
-  const { userId } = req.params;
+  const userId  = parseInt(req.params.userId);
   const seguidorId = req.payload.id;
   let connection;
 
   try {
     // Validación de entradas
-    if (isNaN(userId)) {
-      return res.status(400).json({ error: "ID de usuario inválido" });
+    if (!userId || !seguidorId) {
+      return res.status(401).json({ error: "Usuario no autorizado" });
     }
 
     if (seguidorId === parseInt(userId)) {
@@ -645,10 +645,15 @@ const dejarSeguirUsuario = async (req, res) => {
 
 const seguirUsuario = async (req, res) => {
   const seguidorId = req.payload.id;
-  const { userId } = req.params;
+  const userId  = parseInt(req.params.userId);
   let connection;
-
+console.log(seguidorId,userId)
   try {
+
+    if(!seguidorId || !userId){
+      return res.status(400).json({ msg: "Acción no permitida" });
+    }
+
     if (seguidorId === parseInt(userId)) {
       return res.status(400).json({ msg: "No puedes seguirte a ti mismo" });
     }
