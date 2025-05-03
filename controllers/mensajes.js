@@ -33,7 +33,7 @@ const enviarMsgUsuario = async (req = request, res = response) => {
   }
 
   const buscarUsuario = 'SELECT user_id FROM usuarios WHERE user_id = ?';
-  const insertarMensaje = 'INSERT INTO mensajes (user_envia, user_recibe, contenido, leido,fecha_enviado) VALUES (?, ?, ?, ?)';
+  const insertarMensaje = 'INSERT INTO mensajes (user_envia, user_recibe, contenido, leido,fecha_enviado) VALUES (?, ?, ?, ?, ?)';
 
   try {
       // Ejecuta en secuencia: 1. Busca usuario, 2. Inserta mensaje
