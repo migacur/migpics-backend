@@ -164,6 +164,15 @@ LIMIT ? OFFSET ?;
  const eliminarMensaje = async(req=request,res=response) => {
     const { mensajeId } = req.params;
     const userLogueado = req.payload.id
+
+    if(!mensajeId){
+      return res.status(401).json({msg:"El mensaje no fue encontrado"})
+    }
+
+    if(!userLogueado){
+      return res.status(401).json({msg:"Usuario NO autorizado"})
+    }
+
     const query = 'DELETE FROM mensajes where mensaje_id = ? AND user_envia = ?'
 
     try {
