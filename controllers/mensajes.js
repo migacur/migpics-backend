@@ -22,7 +22,7 @@ const enviarMsgUsuario = async (req = request, res = response) => {
   const userLogueado = req.payload.id;
   const userId  = parseInt(req.params.userId);
   const msg = req.body.mensaje?.trim();
-console.log(req.params)
+
   // Validaciones iniciales
   if (!msg || msg.length < 5) {
       return res.status(400).json({ msg: 'El mensaje debe tener al menos 5 caracteres' });
@@ -33,7 +33,7 @@ console.log(req.params)
   }
 
   const buscarUsuario = 'SELECT user_id FROM usuarios WHERE user_id = ?';
-  const insertarMensaje = 'INSERT INTO mensajes (user_envia, user_recibe, contenido, fecha_enviado) VALUES (?, ?, ?, NOW())';
+  const insertarMensaje = 'INSERT INTO mensajes (user_envia, user_recibe, contenido, leido,fecha_enviado) VALUES (?, ?, ?, ?)';
 
   try {
       // Ejecuta en secuencia: 1. Busca usuario, 2. Inserta mensaje
@@ -48,9 +48,9 @@ console.log(req.params)
       if (usuarioRecibe.user_id === userLogueado) {
           return res.status(400).json({ msg: 'No puedes enviarte mensajes a ti mismo' });
       }
-
+      const mysqlDateTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
       // Inserta el mensaje
-      const [resultado] = await db_config.query(insertarMensaje, [userLogueado, userId, msg]);
+      const [resultado] = await db_config.query(insertarMensaje, [userLogueado, userId, msg,0,mysqlDateTime]);
       
       // Verifica que se haya insertado correctamente
       if (resultado.affectedRows === 0) {
