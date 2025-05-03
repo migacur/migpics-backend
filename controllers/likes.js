@@ -70,7 +70,7 @@ const darLikePost = async (req=request, res=response) => {
         console.log(existingLike)
         res.status(200).json({
             isLiked: !existingLike.length,
-            msg:existingLike.length ? "Te gusta esta publicación" : "Ya no te gusta esta publicación",
+            msg:existingLike.length ? "Ya no te gusta esta publicación" : "Te ha gustado esta publicación",
             likes: totalLikes
         });
 
