@@ -1000,16 +1000,26 @@ const refrescarToken = async (req, res) => {
     await connection.commit();
 
     // 5. Configurar cookies para producción
-    const cookieOptions = {
+
+    const cookieOptionsAccess = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // 🔒 Solo HTTPS en prod
-      sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000
+  secure: true, 
+  sameSite: "None",
+  maxAge: 15 * 60 * 1000,
+  path: "/"
+    }
+
+    const cookieOptionsRefresh = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/"
     };
 
     res
-      .cookie("access_token", newTokens.accessToken, cookieOptions)
-      .cookie("refresh_token", newTokens.refreshToken, cookieOptions)
+      .cookie("access_token", newTokens.accessToken, cookieOptionsAccess)
+      .cookie("refresh_token", newTokens.refreshToken, cookieOptionsRefresh)
       .status(200)
       .json({ message: "Tokens renovados" });
 
