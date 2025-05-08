@@ -109,7 +109,14 @@ userRouter.put(
 );
 userRouter.post("/refresh-token", authMiddleware, refrescarToken);
 userRouter.get("/verify", authMiddleware, (req, res) => {
-  res.json(req.payload);
+  // logica del refresh acá
+  try {
+    res.json(req.payload);
+  } catch (e) {
+    console.log("-------prueba /verify")
+  console.log(e)    
+ }
+ 
 });
 
 module.exports = userRouter;

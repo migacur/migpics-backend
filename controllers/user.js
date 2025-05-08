@@ -1019,7 +1019,7 @@ const refrescarToken = async (req, res) => {
 
     res
       .cookie("access_token", newTokens.accessToken, cookieOptionsAccess)
-      .cookie("refresh_token", newTokens.refreshToken, cookieOptionsRefresh)
+       .cookie("refresh_token", newTokens.refreshToken, cookieOptionsRefresh)
       .status(200)
       .json({ message: "Tokens renovados" });
 
