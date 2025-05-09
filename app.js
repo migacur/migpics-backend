@@ -79,15 +79,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-const path = require('path');
-
-app.use(express.static(path.join(__dirname, 'build')));
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
-
-
 // Inicio del servidor
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
