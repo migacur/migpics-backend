@@ -4,7 +4,7 @@ const db_config = require("../config/db_config");
 const obtenerTopLikes = async(req=request,res=response) => {
     const query = `SELECT p.publicacion_id, p.titulo, COUNT(l.like_id) AS total_likes
     FROM publicaciones p
-    LEFT JOIN Likes_publicaciones l ON p.publicacion_id = l.publicacion_id
+    LEFT JOIN likes_publicaciones l ON p.publicacion_id = l.publicacion_id
     GROUP BY p.publicacion_id, p.titulo
     ORDER BY total_likes DESC LIMIT 10`;
 
