@@ -358,14 +358,12 @@ const cambiarAvatar = async (req = request, res = response) => {
 const mostrarPerfilPublico = async (req = request, res = response) => {
   const { username } = req.params;
   const userLogueado = req.payload.id;
-//console.log(req.payload.username.toLowerCase(),username)
-  if (!userLogueado) {
-    return res
-      .status(401)
-      .json({ msg: "Ingresa/Regístrate para ver este perfil" });
+  console.log(req.payload)
+  if(!req.payload){
+   return res.redirect(`${process.env.FRONTEND_URL}/unauthorized`)
   }
 
-  if(req.payload.username.toLowerCase() === username){
+  if(req.payload.username.toLowerCase() === username.toLowerCase()){
     return res.redirect(`${process.env.FRONTEND_URL}/mi-cuenta`)
   }
 
