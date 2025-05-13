@@ -15,16 +15,19 @@ const allowedOrigins = [
   "https://migpics.onrender.com"
 ];
 
+// Confía en el proxy de Render.com
+app.set("trust proxy", 1);
+
 // Configuración CORS para producción/desarrollo
 app.use(cors({
   origin: function (origin, callback) {
-    // En desarrollo permite cualquier origen (útil para pruebas locales)
+    // En desarrollo permite cualquier origen
     if (process.env.NODE_ENV === "development") {
       return callback(null, true);
     }
 
-    // En producción: validación estricta
-    if (!origin || allowedOrigins.includes(origin)) {
+    // En producción: validación estricta SIN permitir origin vacío
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       console.error(`🚨 Intento de acceso desde origen no permitido: ${origin}`);
@@ -36,10 +39,6 @@ app.use(cors({
   credentials: true,
   optionsSuccessStatus: 204
 }));
-
-app.set("trust proxy", 1); // Necesario para cookies en entornos cloud
-
-// ================================================================
 
 // Middlewares esenciales
 app.use(cookieParser());
