@@ -64,7 +64,7 @@ const authMiddleware = async (req, res, next) => {
         }
         return res.status(403).send('Acceso prohibido');
       }
-      req.user = user;
+      req.payload = user;
       next();
     });
   } else {
