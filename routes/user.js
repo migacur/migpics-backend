@@ -20,6 +20,7 @@ const {
 const uploadFileMiddleware = require("../middleware/uploadFile");
 const authMiddleware = require("../middleware/AuthJWTCookie");
 const { body } = require("express-validator");
+const db_config = require("../config/db_config");
 const userRouter = Router();
 
 userRouter.post(
@@ -108,13 +109,27 @@ userRouter.put(
   cambiarPassword
 );
 userRouter.post("/refresh-token", authMiddleware, refrescarToken);
-userRouter.get("/verify", authMiddleware, (req, res) => {
-  // logica del refresh acá
+userRouter.get("/verify", authMiddleware, async(req, res) => {
+  const refreshToken = req.cookies.refresh_token;
   try {
     res.json(req.payload);
   } catch (e) {
-    console.log("-------prueba /verify")
-  console.log(e)    
+      await db_config.query("DELETE FROM refresh_tokens WHERE token = ?", [
+        refreshToken,
+      ]);
+   res.clearCookie("access_token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+    });
+
+    res.clearCookie("refresh_token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+    });
+    
+    console.log(e)    
  }
  
 });
