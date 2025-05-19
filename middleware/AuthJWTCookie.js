@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
-const verificarRefreshTokenEnBD = require('../helpers/verificarRefreshToken');
-const generarToken = require('../helpers/GenerarToken');
+//const verificarRefreshTokenEnBD = require('../helpers/verificarRefreshToken');
+//const generarToken = require('../helpers/GenerarToken');
+const generarOnlyToken = require('../helpers/generarOnlyToken');
 /*
 const authMiddleware = (req, res, next) => {
   const token = req.cookies.access_token;
@@ -19,7 +20,7 @@ const authMiddleware = (req, res, next) => {
     next();
   });
 }; */
-
+/*
 const authMiddleware = async (req, res, next) => {
   const accessToken = req.cookies.access_token;
   const refreshToken = req.cookies.refresh_token;
@@ -87,6 +88,56 @@ const authMiddleware = async (req, res, next) => {
     }
     return res.status(403).send('Acceso prohibido');
   }
+};
+*/
+const authMiddleware = async (req, res, next) => {
+  const accessToken = req.cookies.access_token;
+  const refreshToken = req.cookies.refresh_token;
+
+  const handleUnauthorized = (msg = "Sesión expirada") => {
+    res.clearCookie("access_token");
+    res.clearCookie("refresh_token");
+    return res.status(401).json({ msg });
+  };
+
+  // Verificar accessToken
+  if (accessToken) {
+    try {
+      const decoded = jwt.verify(accessToken, process.env.TOKEN_KEY);
+      req.payload = decoded;
+      return next();
+    } catch (err) {
+      if (err.name !== "TokenExpiredError") {
+        return handleUnauthorized("Token inválido");
+      }
+    }
+  }
+
+  // Si el accessToken está expirado o no existe, verificar refreshToken
+  if (refreshToken) {
+    try {
+      // Verificar JWT del refreshToken (sin BD)
+      const decodedRefresh = jwt.verify(refreshToken, process.env.TOKEN_KEY_REFRESH);
+      
+      // Generar nuevo accessToken
+      const newAccessToken = generarOnlyToken(decodedRefresh);
+      
+      res.cookie("access_token", newAccessToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "None",
+        maxAge: 15 * 60 * 1000,
+        path: "/",
+      });
+
+      req.payload = decodedRefresh;
+      return next();
+    } catch (error) {
+      return handleUnauthorized();
+    }
+  }
+
+  return handleUnauthorized("No autenticado");
 };
 
 module.exports = authMiddleware;

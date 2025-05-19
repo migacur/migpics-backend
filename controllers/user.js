@@ -78,7 +78,7 @@ try {
   }
 };
 */
-const crearUsuario = async (req, res) => {
+const crearUsuario = async (req=request, res=response) => {
   const { username, password, repeat, email } = req.body;
   const avatar = "https://i.postimg.cc/0Nq25498/avatar.png";
   
@@ -140,7 +140,7 @@ const crearUsuario = async (req, res) => {
   }
 };
 
-const ingresarUsuario = async (req, res) => {
+const ingresarUsuario = async (req=request, res=response) => {
   const { username, password } = req.body;
 
   try {
@@ -237,18 +237,19 @@ console.log("Headers de cookies enviados:", res.getHeaders()["set-cookie"]);
   }
 };
 
-const cerrarSesion = async (req, res) => {
+const cerrarSesion = async (req=request, res=response) => {
   try {
     const usuarioId = req.body.userId;
-
-    if (!usuarioId) {
-      return res.status(400).json({ msg: "Se requiere ID de usuario" });
+    const userLogueado = req.payload.id
+    console.log(`TEST --- ${usuarioId} ---- ${userLogueado} --- TEST`)
+    if (!usuarioId || usuarioId !== userLogueado) {
+      return res.status(401).json({ msg: "Usuario NO autorizado para realizar esta acción" });
     }
 
     // 1. Eliminar tokens
     const [result] = await db_config.query(
       "DELETE FROM refresh_tokens WHERE user_id = ?",
-      [usuarioId]
+      [userLogueado]
     );
 
     // 2. Verificar si se eliminó algo (opcional)
@@ -257,17 +258,8 @@ const cerrarSesion = async (req, res) => {
     }
 
     // 3. Limpiar cookies (con mismas opciones de creación)
-    res.clearCookie("access_token", {
-      httpOnly: true,
-      secure: true,
-      sameSite: "None",
-    });
-
-    res.clearCookie("refresh_token", {
-      httpOnly: true,
-      secure: true,
-      sameSite: "None",
-    });
+     res.clearCookie("access_token");
+     res.clearCookie("refresh_token");
 
     // 4. Respuesta exitosa
     res.status(200).json({ msg: "Sesión cerrada exitosamente" });
@@ -829,7 +821,7 @@ const showListadoFollowing = async (req = request, res = response) => {
   }
 };
 
-const recuperarPassword = async (req, res) => {
+const recuperarPassword = async (req=request, res=response) => {
   const { email } = req.body;
   let connection;
 
@@ -890,7 +882,7 @@ const recuperarPassword = async (req, res) => {
   }
 };
 
-const cambiarPassword = async (req, res) => {
+const cambiarPassword = async (req=request, res=response) => {
   const { codigo, password, repeatPassword } = req.body;
   let connection;
 
@@ -955,7 +947,7 @@ const cambiarPassword = async (req, res) => {
   }
 };
 
-const refrescarToken = async (req, res) => {
+const refrescarToken = async (req=request, res=response) => {
   const refreshToken = req.cookies.refresh_token;
   let connection;
 

@@ -60,7 +60,7 @@ userRouter.post(
   ],
   ingresarUsuario
 );
-userRouter.post("/cerrar-sesion", cerrarSesion);
+userRouter.post("/cerrar-sesion",authMiddleware,cerrarSesion);
 userRouter.get("/usuario/:username", authMiddleware, mostrarPerfilPublico);
 userRouter.get("/mi-perfil/:userId", authMiddleware, mostrarPerfilPrivado);
 userRouter.get(
