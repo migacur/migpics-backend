@@ -126,7 +126,7 @@ const authMiddleware = async (req, res, next) => {
         httpOnly: true,
         secure: true,
         sameSite: "None",
-        maxAge: 15 * 60 * 1000,
+        maxAge: 60 * 60 * 1000, // 1 hora
         path: "/",
       });
 

@@ -195,7 +195,7 @@ res.cookie("access_token", token.accessToken, {
   secure: true, 
   sameSite: "None",
 //  domain: process.env.NODE_ENV === "production" ? ".onrender.com" : undefined,
-  maxAge: 15 * 60 * 1000, // 15 minutos
+  maxAge: 60 * 60 * 1000, // 1 hora
   path: "/"
 });
 
@@ -205,7 +205,7 @@ res.cookie("refresh_token", token.refreshToken, { // 👈 refresh_token
   secure: true,
   sameSite: "None",
  // domain: process.env.NODE_ENV === "production" ? ".onrender.com" : undefined,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
+ maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
   path: "/" // 👈 Ruta específica para refresh
 });
 

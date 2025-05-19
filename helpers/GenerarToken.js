@@ -10,11 +10,11 @@ const generarToken = (user) => {
     };
 
     const accessToken = jwt.sign(payload, secretKeyToken, {
-        expiresIn: '15m'
+        expiresIn: '1h'
     });
 
     const refreshToken = jwt.sign(payload, secretKeyTokenRefresh, {
-        expiresIn: '7d'
+        expiresIn: '30d'
     });
 
 
