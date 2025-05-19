@@ -12,8 +12,8 @@ async function verificarRefreshTokenEnBD(token) {
     }
 
     if (new Date(resultados[0].expiracion) < new Date()) {
-      await db_config.query("DELETE FROM refresh_tokens WHERE token_id = ?", [
-        resultados[0].token_id,
+      await db_config.query("DELETE FROM refresh_tokens WHERE token = ?", [
+        resultados[0].token,
       ]);
       throw new Error("Token expirado");
     }
