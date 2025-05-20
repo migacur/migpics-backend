@@ -4,13 +4,9 @@ const generarOnlyToken = (user) => {
    console.log("--- TOKEN ONLY ---")
    console.log(user)
    console.log("--- TOKEN ONLY ---")
-    const payload = {
-        username: user.username,
-        id: user.user_id
-    };
-
+  
   return jwt.sign(
-    payload,
+    user,
     process.env.TOKEN_KEY,
     { expiresIn: "1h" }
   );
