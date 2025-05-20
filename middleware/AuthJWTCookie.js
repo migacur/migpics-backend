@@ -104,6 +104,9 @@ const authMiddleware = async (req, res, next) => {
   if (accessToken) {
     try {
       const decoded = jwt.verify(accessToken, process.env.TOKEN_KEY);
+      console.log("--- DECODED ACCESS ---")
+      console.log(decoded)
+      console.log("--- DECODED ACCESS ---")
       req.payload = decoded;
       return next();
     } catch (err) {
@@ -118,7 +121,9 @@ const authMiddleware = async (req, res, next) => {
     try {
       // Verificar JWT del refreshToken (sin BD)
       const decodedRefresh = jwt.verify(refreshToken, process.env.TOKEN_KEY_REFRESH);
-      
+      console.log("--- DECODED REFRESH ---")
+      console.log(decodedRefresh)
+      console.log("--- DECODED REFRESH ---")
       // Generar nuevo accessToken
       const newAccessToken = generarOnlyToken(decodedRefresh);
       

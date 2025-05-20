@@ -414,7 +414,7 @@ GROUP BY
 const mostrarPerfilPrivado = async (req = request, res = response) => {
   const { userId } = req.params;
   const userLogin = req.payload.id;
-
+console.log(`--- TEST PERFIL PRIVADO: ${userId} - ${userLogin} ---`)
   if (!userLogin) {
     return res
       .status(401)
