@@ -241,6 +241,9 @@ const cerrarSesion = async (req=request, res=response) => {
   try {
     const usuarioId = req.body.userId;
     const userLogueado = req.payload.id
+    console.log("--- req.body ---");
+console.log(req.body);
+console.log("--- req.body ---");
     console.log(`TEST --- ${usuarioId} ---- ${userLogueado} --- TEST`)
     if (!usuarioId || usuarioId !== userLogueado) {
       return res.status(401).json({ msg: "Usuario NO autorizado para realizar esta acción" });
