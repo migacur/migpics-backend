@@ -58,8 +58,9 @@ const server = http.createServer(app);
 // Configura Socket.io (permite conexiones desde tu frontend)
 const io = socketIo(server, {
   cors: {
-    origin: "https://migpics.onrender.com/", // Cambia si tu frontend está en otro puerto
-    methods: ["GET", "POST"]
+    origin: allowedOrigins, // Cambia si tu frontend está en otro puerto
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
