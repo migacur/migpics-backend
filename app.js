@@ -1,5 +1,6 @@
 const express = require("express");
 const http = require("http");
+const socketIo = require('socket.io');
 const dotenv = require("dotenv");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
@@ -53,6 +54,33 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
+const server = http.createServer(app);
+// Configura Socket.io (permite conexiones desde tu frontend)
+const io = socketIo(server, {
+  cors: {
+    origin: "https://migpics.onrender.com/", // Cambia si tu frontend está en otro puerto
+    methods: ["GET", "POST"]
+  }
+});
+
+// ------------------
+// Maneja conexiones de Socket.io
+io.on('connection', (socket) => {
+  console.log('✔ Usuario conectado:', socket.id);
+
+  // Cuando un usuario se une a su "sala" personal (para recibir notificaciones)
+  socket.on('join_user_room', (userId) => {
+    socket.join(`user_${userId}`);
+    console.log(`🔔 Usuario ${userId} listo para recibir notifs`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('❌ Usuario desconectado:', socket.id);
+  });
+});
+
+// -----------------
+
 // Importación y uso de rutas
 const routers = [
   require("./routes/user"),
@@ -79,7 +107,7 @@ app.use((err, req, res, next) => {
 });
 
 // Inicio del servidor
-const server = http.createServer(app);
+
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {

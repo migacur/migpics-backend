@@ -57,6 +57,12 @@ const enviarMsgUsuario = async (req = request, res = response) => {
           throw new Error('No se pudo insertar el mensaje');
       }
 
+    req.app.get('io').to(`user_${userId}`).emit('new_message', {
+      userLogueado,
+      msg,
+      timestamp: new Date()
+    });
+
       return res.status(200).json({ msg: 'Mensaje enviado exitosamente' });
 
   } catch (error) {
