@@ -57,7 +57,16 @@ const enviarMsgUsuario = async (req = request, res = response) => {
           throw new Error('No se pudo insertar el mensaje');
       }
 
-    req.app.get('io').to(`user_${userId}`).emit('new_message', {
+     // Accede a io desde la app
+    const io = req.app.get('io');
+    
+    // Verifica que io esté definido
+    if (!io) {
+      throw new Error('Socket.io no está disponible');
+    }
+
+    // Emite la notificación
+    io.to(`user_${userId}`).emit('new_message', {
       userLogueado,
       msg,
       timestamp: new Date()

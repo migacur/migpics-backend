@@ -63,7 +63,7 @@ const io = socketIo(server, {
     credentials: true
   }
 });
-
+app.set('io', io); 
 // ------------------
 // Maneja conexiones de Socket.io
 io.on('connection', (socket) => {
