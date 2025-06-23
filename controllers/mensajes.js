@@ -62,7 +62,7 @@ const enviarMsgUsuario = async (req = request, res = response) => {
               [msg,userId,new Date()] );
          
     
-    const [countResult] = await db
+    const [countResult] = await db_config
     .query('SELECT COUNT(*) AS count FROM notificaciones WHERE user_id = ? AND is_read = 0', [userId]);
     const unreadCount = countResult[0].count;
 
