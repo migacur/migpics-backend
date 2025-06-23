@@ -57,6 +57,15 @@ const enviarMsgUsuario = async (req = request, res = response) => {
           throw new Error('No se pudo insertar el mensaje');
       }
 
+          await db_config.query(
+              'INSERT INTO notificaciones (mensaje,user_id,created_at) VALUES (?, ?, ?)',
+              [msg,userId,new Date()] );
+         
+    
+    const [countResult] = await db
+    .query('SELECT COUNT(*) AS count FROM notificaciones WHERE user_id = ? AND is_read = 0', [userId]);
+    const unreadCount = countResult[0].count;
+
      // Accede a io desde la app
     const io = req.app.get('io');
     
@@ -65,13 +74,16 @@ const enviarMsgUsuario = async (req = request, res = response) => {
       throw new Error('Socket.io no está disponible');
     }
 
+
     // Emite la notificación
     io.to(`user_${userId}`).emit('new_message', {
-      userLogueado,
-      msg,
-      timestamp: new Date()
+     userLogueado,
+     msg,
+     timestamp: new Date(),
+     count:unreadCount
     });
 
+     
       return res.status(200).json({ msg: 'Mensaje enviado exitosamente' });
 
   } catch (error) {
