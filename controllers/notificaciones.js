@@ -1,9 +1,10 @@
 // controllers/notificationController.js
 const { request, response } = require("express");
-const db= require("../config/db_config");
+const db_config = require("../config/db_config");
 
 const buscarNotificaciones = async(req=request, res=response) => {
   const { userId } = req.params;
+  console.log(userId)
   const userLogueado = req.payload.id;
 
   if(!userId || !userLogueado){
@@ -16,8 +17,9 @@ const buscarNotificaciones = async(req=request, res=response) => {
 
   try {
      const query = 'SELECT COUNT(*) AS contador FROM notificaciones WHERE user_id = ?';
-     const [results] = await db.query(query, [userId])
+     const [results] = await db_config.query(query, [userId])
      const notificaciones = results[0].contador;
+     console.log(notificaciones)
      res.status(200).json(notificaciones);
   } catch (e) {
     console.log(e)
@@ -30,7 +32,7 @@ const marcarNotificacion = async(req=request, res=response) => {
 
   try {
      const query = 'UPDATE notificaciones SET is_read = 1 WHERE user_id = ?';
-     await db.query(query, [notificationId])
+     await db_config.query(query, [notificationId])
      res.status(200).json({ msg: 'Se han leído las notificaciones' });
   } catch (e) {
     console.log(e)
