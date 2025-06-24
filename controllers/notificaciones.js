@@ -4,16 +4,12 @@ const db_config = require("../config/db_config");
 
 const buscarNotificaciones = async(req=request, res=response) => {
   const { userId } = req.params;
-  console.log(userId)
   const userLogueado = req.payload.id;
 
   if(!userId || !userLogueado){
-    return res.status(401).json({ msg: 'El usuario no se encuentra logueado' });
+    return res.status(401).json({ msg: 'Ocurrió un problema al autenticar el usuario' });
   }
 
-  if(userId !== userLogueado){
-    return res.status(401).json({ msg: 'Ocurrió un error al verificar el usuario' });
-  }
   try {
     const query = `SELECT COUNT(*) AS unread_count FROM notificaciones 
                    WHERE user_id = ? AND is_read = 0`;
