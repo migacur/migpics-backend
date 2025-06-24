@@ -13,7 +13,7 @@ const buscarNotificaciones = async(req=request, res=response) => {
   try {
     const query = `SELECT COUNT(*) AS unread_count FROM notificaciones 
                    WHERE user_id = ? AND is_read = 0`;
-    const [result] = await db.query(query, [userId]);
+    const [result] = await db_config.query(query, [userId]);
     
     res.json({ unread_count: result[0].unread_count });
   } catch (error) {
