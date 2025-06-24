@@ -76,11 +76,8 @@ const enviarMsgUsuario = async (req = request, res = response) => {
 
 
     // Emite la notificación
-    io.to(`user_${userId}`).emit('new_message', {
-     userLogueado,
-     msg,
-     timestamp: new Date(),
-     count:unreadCount
+    io.to(`user_${userId}`).emit('actualizador_contador', {
+      unread_count: unreadCount
     });
 
      
