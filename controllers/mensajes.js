@@ -58,7 +58,7 @@ const enviarMsgUsuario = async (req = request, res = response) => {
       }
 
           await db_config.query(
-              'INSERT INTO notificaciones (tipo_notificacion,mensaje,user_envia,user_recibe,created_at) VALUES (?, ?, ?)',
+              'INSERT INTO notificaciones (tipo_notificacion,mensaje,user_envia,user_recibe,created_at) VALUES (?,?,?,?,?)',
               [1,msg,userLogueado,userId,new Date()] );
          
     
