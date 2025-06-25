@@ -25,7 +25,7 @@ const marcarNotificacion = async(req=request, res=response) => {
   const { userId } = req.params;
   const userLogueado = req.payload.id;
 
-  if(!notificationId || !userLogueado){
+  if(!userId || !userLogueado){
      return res.status(401).json({ msg: 'NO estás autorizado para esta acción' });
   }
 
