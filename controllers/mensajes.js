@@ -63,7 +63,7 @@ const enviarMsgUsuario = async (req = request, res = response) => {
          
     
     const [countResult] = await db_config
-    .query('SELECT COUNT(*) AS count FROM notificaciones WHERE user_id = ? AND is_read = 0', [userId]);
+    .query('SELECT COUNT(*) AS count FROM notificaciones WHERE user_recibe = ? AND is_read = 0', [userId]);
     const unreadCount = countResult[0].count;
 
      // Accede a io desde la app
