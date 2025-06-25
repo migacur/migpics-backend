@@ -80,6 +80,10 @@ const enviarMsgUsuario = async (req = request, res = response) => {
       unread_count: unreadCount
     });
 
+    // En el backend, antes de emitir:
+console.log(`[Backend] Emitiendo actualizar_contador a user_${userId}`);
+console.log(`[Backend] Conteo: ${unreadCount}`);
+console.log(`[Backend] Salas activas:`, io.sockets.adapter.rooms);
      
       return res.status(200).json({ msg: 'Mensaje enviado exitosamente' });
 
