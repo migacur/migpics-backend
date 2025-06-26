@@ -81,7 +81,7 @@ const enviarMsgUsuario = async (req = request, res = response) => {
 
 
     // Emite la notificación
-    io.to(`user_${userId}`).emit('actualizador_contador', {
+    io.to(`user_${userId}`).emit('actualizar_contador', {
       unread_count: unreadCount
     });
 
