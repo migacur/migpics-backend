@@ -74,6 +74,11 @@ const enviarMsgUsuario = async (req = request, res = response) => {
       throw new Error('Socket.io no está disponible');
     }
 
+    io.to(`user_${userId}`).emit('new_message', {
+      userLogueado,
+      msg
+    });
+
 
     // Emite la notificación
     io.to(`user_${userId}`).emit('actualizador_contador', {
