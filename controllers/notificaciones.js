@@ -28,7 +28,7 @@ const marcarNotificacion = async(req=request, res=response) => {
   if(!userId || !userLogueado){
      return res.status(401).json({ msg: 'NO estás autorizado para esta acción' });
   }
-
+  // utilizar affectedRows o changedRows? 
   try {
      const query = 'UPDATE notificaciones SET is_read = 1 WHERE user_envia = ? AND user_recibe = ?';
      await db_config.query(query, [userId,userLogueado])

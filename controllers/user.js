@@ -261,8 +261,20 @@ console.log("--- req.body ---");
     }
 
     // 3. Limpiar cookies (con mismas opciones de creación)
-     res.clearCookie("access_token");
-     res.clearCookie("refresh_token");
+    res.clearCookie("access_token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "None",
+    path: "/"
+  });
+  
+  res.clearCookie("refresh_token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "None",
+    path: "/"
+  });
+
 
     // 4. Respuesta exitosa
     res.status(200).json({ msg: "Sesión cerrada exitosamente" });
